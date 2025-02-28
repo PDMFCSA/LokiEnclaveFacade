@@ -177,7 +177,8 @@ function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunct
 
     utils.bindAutoPendingFunctions(this, ["on", "off", "dispatchEvent", "beginBatch", "isInitialised", "getEnclaveType", "getDID", "getUniqueIdAsync"]);
 
-    this.storageDB = new LokiDb(rootFolder, autosaveInterval, adaptorConstructorFunction);
+    // this.storageDB = new LokiDb(rootFolder, autosaveInterval, adaptorConstructorFunction);
+    this.storageDB = new LokiDb({uri: process.env.COUCH_DB_URI});
     this.finishInitialisation();
 }
 
