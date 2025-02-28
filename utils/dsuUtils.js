@@ -1,5 +1,3 @@
-const openDSU = require("opendsu");
-
 /**
  * Parses the provided keySSI or throws an error if it's invalid or undefined.
  *
@@ -13,7 +11,7 @@ function safeParseKeySSI(keySSI) {
 
     if (typeof keySSI === "string") {
         try {
-            return openDSU.loadAPI("keyssi").parse(keySSI);
+            return require("opendsu").loadAPI("keyssi").parse(keySSI);
         } catch (e) {
             throw new Error(`Failed to parse keySSI ${keySSI}: ${e.message || e}`);
         }

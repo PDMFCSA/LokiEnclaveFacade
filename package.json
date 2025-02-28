@@ -19,6 +19,9 @@
     "url": "https://github.com/OpenDSU/LokiEnclaveFacade/issues"
   },
   "homepage": "https://github.com/OpenDSU/LokiEnclaveFacade#readme",
+  "dependencies": {
+    "nano": "^10.1.4"
+  },
   "devDependencies": {
     "jest": "^29.7.0"
   }
