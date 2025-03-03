@@ -2,6 +2,7 @@ const {normalizeNumber, validateSort, buildSelector, DBKeys, pruneOpenDSUFields,
 const logger = $$.getLogger("DBService");
 const nano = require("nano");
 const {OpenDSUKeys} = require("../utils/constants");
+const {processInChunks} = require("../utils/chunk");
 
 /**
  * DBService for database operations.
@@ -14,7 +15,7 @@ class DBService {
      */
     constructor(config) {
         this.config = config;
-        this.dbClient = this._createDBClient(config);
+        this.dbConnection = this.__createConnection(config);
     }
 
     /**
@@ -22,9 +23,9 @@ class DBService {
      * @param {{uri: string, username?: string, secret?: string}} config - Configuration object containing database connection details.
      * @returns {nano.ServerScope} - A database client instance.
      */
-    _createDBClient(config) {
-        if (this.dbClient)
-            return this.dbClient;
+    __createConnection(config) {
+        if (this.dbConnection)
+            return this.dbConnection;
 
         const url = new URL(config.uri);
         if (url.username && url.password)
@@ -33,12 +34,12 @@ class DBService {
         const username = config.username || url.username || "";
         const password = config.secret || url.password || "";
 
-        this.dbClient = nano({
+        this.dbConnection = nano({
             url: config.uri,
             requestDefaults: {auth: {username, password}}
         });
 
-        return this.dbClient;
+        return this.dbConnection;
     }
 
     /**
@@ -48,9 +49,10 @@ class DBService {
      */
     async dbExists(dbName) {
         try {
-            await this.dbClient.db.get(dbName);
-            return true;
+            const dbList = await this.dbConnection.db.list();
+            return dbList.includes(dbName);
         } catch (error) {
+            logger.error(`Failed to check if database "${dbName}" exists:`, error);
             return false;
         }
     }
@@ -59,23 +61,24 @@ class DBService {
      * Creates a new database with the specified name and indexes if it doesn't already exist.
      *
      * @param {string} dbName - The name of the database to be created.
-     * @param {Array<string>} indexes - The fields to be indexed.
+     * @param {Array<string>} [indexes] - The fields to be indexed.
      * @returns {Promise<boolean>}
      * @throws {Error} - Throws an error if database creation already exists or database/indexes creation fails.
      */
-    async createDatabase(dbName, indexes) {
+    async createDatabase(dbName, indexes = []) {
         try {
             if (await this.dbExists(dbName))
                 throw new Error(`Database "${dbName}" already exists.`);
 
-            await this.dbClient.db.create(dbName);
+            await this.dbConnection.db.create(dbName);
             logger.info(`Database "${dbName}" created successfully.`);
 
-            await this.addIndex(dbName, indexes);
+            const indexList = Array.isArray(indexes) && indexes.length ? indexes : [DBKeys.TIMESTAMP];
+            await this.addIndex(dbName, indexList);
 
             return true;
         } catch (err) {
-            logger.error(`Error creating database or adding indexes for "${dbName}".`);
+            logger.error(`Fail creating database or adding indexes for "${dbName}".`);
             throw err;
         }
     }
@@ -90,11 +93,12 @@ class DBService {
     async openDatabase(dbName) {
         try {
             if (await this.dbExists(dbName))
-                return this.dbClient.use(dbName);
+                return this.dbConnection.use(dbName);
 
-            logger.info(`Database does not exist. Creating new database "${dbName}"...`);
+            logger.info(`Database does not exist. Creating new database "${dbName}".`);
             await this.createDatabase(dbName);
-            return this.dbClient.use(dbName);
+            // TODO - Remove, return DBService instance
+            return this.dbConnection.use(dbName);
         } catch (error) {
             logger.error(`Error in openDatabase: ${error.message || error}`);
             throw error;
@@ -108,9 +112,14 @@ class DBService {
      */
     async deleteDatabase(dbName) {
         try {
-            await this.dbClient.destroy(dbName);
+            await this.dbConnection.db.destroy(dbName);
             return true;
         } catch (error) {
+            if (error.status === 404) {
+                logger.warn(`Database "${dbName}" does not exist. No deletion required.`);
+                return true;
+            }
+
             logger.error(`Error deleting database ${dbName}:`, error);
             throw error;
         }
@@ -126,13 +135,13 @@ class DBService {
     async listDatabases(verbose = false) {
         const self = this;
         try {
-            const list = await this.dbClient.db.list();
+            const list = await this.dbConnection.db.list();
             if (!verbose)
                 return list;
 
             const databaseInfoList = [];
             for (const dbName of list) {
-                const metadata = await self.dbClient.use(dbName).info(); // Get metadata of the database
+                const metadata = await self.dbConnection.use(dbName).info(); // Get metadata of the database
                 databaseInfoList.push({
                     name: dbName,
                     type: "collection",
@@ -149,15 +158,19 @@ class DBService {
     /**
      * Retrieves the document count for a specific table
      *
-     * @param {string} tableName - The name of the table (or database) to retrieve the document count for.
+     * @param {string} tableName - The table name to get the document count
      * @returns {Promise<number>} - A promise that resolves to the document count of the specified table.
      * @throws {Error} - Throws an error if retrieving the document count fails.
      */
     async countDocs(tableName) {
         try {
-            const info = await this.dbClient.db.use(tableName).info();
+            const info = await this.dbConnection.db.use(tableName).info();
             return info.doc_count || 0;
         } catch (error) {
+            if (error.statusCode === 404) {
+                logger.warn(`Table "${tableName}" does not exist. Unable to count documents.`);
+                return 0;
+            }
             logger.error(`Failed to retrieve document count for table ${tableName}:`, error);
             throw error;
         }
@@ -167,31 +180,32 @@ class DBService {
      * Adds indexes to a specific table.
      *
      * @param {string} tableName - The name of the table to add the index to.
-     * @param {string | Array<string>} properties - The property to be indexed.
-     * @returns {Promise<void>} - A promise that resolves when the index is successfully added.
+     * @param {string | Array<string>} properties - The property or property list to be indexed.
+     * @returns {Promise<boolean>} - Resolves to `true` if the index was successfully created.
      * @throws {Error} - Throws an error if the table doesn't exist or if adding the index fails.
      */
     async addIndex(tableName, properties) {
         if (!properties || (Array.isArray(properties) && properties.length === 0)) {
             logger.info(`No indexes provided for table: ${tableName}. Skipping index creation.`);
-            return;
+            return false;
         }
+
+        if (!await this.dbExists(tableName))
+            throw new Error(`Table "${tableName}" does not exist.`);
 
         properties = Array.isArray(properties) ? properties : [properties];
         const index = `${properties.join("_")}_index`;
         try {
-            if (!await this.dbExists(tableName))
-                throw new Error(`Table "${tableName}" does not exist.`);
-
-            await this.dbClient.use(tableName).createIndex({
+            await this.dbConnection.use(tableName).createIndex({
                 name: index,
                 index: {
-                    fields: [properties]
+                    fields: properties
                 },
                 type: "json" // default
             });
 
             logger.info(`Added index ${index} for table "${tableName}".`);
+            return true;
         } catch (err) {
             logger.error(`Could not add index ${index} on ${tableName}.`);
             throw new Error(`Could not add index ${index} on ${tableName}: ${err.message}`);
@@ -199,19 +213,20 @@ class DBService {
     }
 
     /**
-     * Inserts a document into a specified database.
-     * @param {string} dbName - The name of the database.
+     * Inserts a document into a specified table.
+     * @param {string} tableName
      * @param {string} _id - The primary key for the record.
      * @param {Object} document - The document to insert.
      * @returns {Promise<{ [key: string]: any }>} - The inserted document.
      * @throws {Error} - Throws an error if any operation fails, including checking if the record exists or inserting the record.
      */
-    async insertDocument(dbName, _id, document) {
+    async insertDocument(tableName, _id, document) {
+        // TODO - Empty objects {} are not being validated.
         try {
-            const db = await this.openDatabase(dbName);
-            const record = await this.readDocument(dbName, _id).catch(() => undefined);
+            await this.openDatabase(tableName);
+            const record = await this.readDocument(tableName, _id).catch(() => undefined);
             if (record)
-                throw new Error(`A record with PK "${_id}" already exists in ${dbName}`);
+                throw new Error(`A record with PK "${_id}" already exists in ${tableName}`);
 
             const insert = {
                 ...pruneOpenDSUFields(document),
@@ -219,8 +234,8 @@ class DBService {
                 [DBKeys.TIMESTAMP]: Date.now()
             };
 
-            const {id} = await db.insert(insert);
-            return this.readDocument(dbName, id);
+            const {id} = await this.dbConnection.use(tableName).insert(insert);
+            return this.readDocument(tableName, id);
         } catch (err) {
             logger.error(err);
             throw err;
@@ -228,40 +243,36 @@ class DBService {
     }
 
     /**
-     * Retrieves a document by its ID from a specified database.
-     * @param {string} dbName - The name of the database.
-     * @param {string} id - The ID of the document to retrieve.
+     * Retrieves a document by its ID from the specified table.
+     * @param {string} tableName
+     * @param {string} _id - The ID of the document to retrieve.
      * @returns {Promise<{ pk: string, [key: string]: any }>} - The retrieved document.
      */
-    async readDocument(dbName, id) {
+    async readDocument(tableName, _id) {
         try {
-            const document = await this.dbClient.use(dbName).get(id);
+            const document = await this.dbConnection.use(tableName).get(_id);
             return remapObject(document);
         } catch (error) {
-            logger.error(`Error retrieving document ${id} from database ${dbName}:`, error);
+            if (error.statusCode !== 404)
+                logger.error(`Failed to retrieve document ${_id} from table ${tableName}:`, error);
             throw error;
         }
     }
 
     /**
      * Updates a record in the specified table.
-     * If the record does not exist and the `fallbackInsert` flag is set, it will insert the record instead.
+     * If the record does not exist and the `fallbackInsert` flag is set to true, it will insert the record instead.
      *
-     * @param {string} tableName - The name of the table to update the record in.
-     * @param {string} id - The ID of the document to update.
+     * @param {string} tableName
+     * @param {string} _id - The ID of the document to update.
      * @param {Object} document - The record data to update.
      * @returns {Promise<{ [key: string]: any }>} - The updated or inserted record.
      * @throws {Error} - If the operation fails.
      */
-    async updateDocument(tableName, id, document) {
+    async updateDocument(tableName, _id, document) {
         try {
-            const db = this.dbClient.use(tableName);
-            const dbRecord = await db.get(id);
-            if (!dbRecord && document[OpenDSUKeys.FALLBACK_INSERT]) {
-                delete document[OpenDSUKeys.FALLBACK_INSERT]; // Remove the fallback flag
-                return this.insertDocument(tableName, id, document);
-            }
-
+            const dbClient = this.dbConnection.use(tableName);
+            const dbRecord = await dbClient.get(_id);
             const _rev = dbRecord[DBKeys.REV];
             for (let prop in document) {
                 dbRecord[prop] = document[prop];
@@ -269,48 +280,57 @@ class DBService {
 
             const update = {
                 ...pruneOpenDSUFields(dbRecord),
-                [DBKeys.PK]: id,
+                [DBKeys.PK]: _id,
                 [DBKeys.REV]: _rev,
                 [DBKeys.TIMESTAMP]: Date.now()
             };
 
-            const response = await db.insert(update);
+            const response = await dbClient.insert(update);
             return await this.readDocument(tableName, response.id);
         } catch (error) {
-            logger.error(`Error updating document ${id} in database ${tableName}:`, error);
+            if (error.statusCode === 404) {
+                if (document[OpenDSUKeys.FALLBACK_INSERT]) {
+                    delete document[OpenDSUKeys.FALLBACK_INSERT];
+                    return this.insertDocument(tableName, _id, document);
+                }
+                throw new Error(`Failed to update document "${_id}" from "${tableName}": Not found.`);
+            }
+
+            logger.error(`Failed to update document "${_id}" from "${tableName}":`, error);
             throw error;
         }
     }
 
     /**
      * Deletes a record from the specified table.
-     * @param {string} tableName - The name of the table (database) to delete the record from.
-     * @param {string} id - The primary key (ID) of the record to delete.
-     * @returns {Promise<{ pk: string, [key: string]: any }>} - The deleted record.
+     * @param {string} tableName
+     * @param {string} _id - The primary key (ID) of the record to delete.
+     * @returns {Promise<{ pk: string }>} - The deleted record.
      * @throws {Error} - If the operation fails.
      */
-    async deleteDocument(tableName, id) {
+    async deleteDocument(tableName, _id) {
         try {
-            const document = await this.readDocument(tableName, id);
-            await this.dbClient.use(tableName).destroy(id, document[DBKeys.REV]);
-            return document;
+            const dbClient = this.dbConnection.use(tableName);
+            const document = await dbClient.get(_id);
+            await dbClient.destroy(_id, document[DBKeys.REV]);
+            return {[OpenDSUKeys.PK]: _id};
         } catch (error) {
             if (error.statusCode === 404)
-                return {pk: id};
+                return {[OpenDSUKeys.PK]: _id};
 
-            logger.error(`Error deleting document ${id} from table ${tableName}:`, error);
+            logger.error(`Error deleting document ${_id} from table ${tableName}:`, error);
             throw error;
         }
     }
 
     /**
-     * Lists documents from a specified database.
+     * Lists documents from a specified table.
      *
-     * @param {string} tableName - The name of the database to fetch documents from.
+     * @param {string} tableName - The name of the table to fetch documents from.
      * @param {Object} [options={}] - Optional configuration object for listing documents.
      * @param {number} [options.limit] - The maximum number of documents to fetch (optional).
      * @returns {Promise<Array<{ [key: string]: any }>>} - A promise that resolves to an array of document objects.
-     * @throws {Error} - Throws an error if the database query fails.
+     * @throws {Error} - Throws an error if the query fails.
      */
     async listDocuments(tableName, options = {}) {
         const {limit} = options;
@@ -319,8 +339,8 @@ class DBService {
             if (limit && Number.isInteger(limit) && limit > 0)
                 queryOptions.limit = limit;
 
-            const response = await this.dbClient.use(tableName).list(queryOptions);
-            return response.rows.map(row => row.doc) || [];
+            const response = await this.dbConnection.use(tableName).list(queryOptions);
+            return processInChunks(response.rows, 2, (row) => remapObject(row.doc));
         } catch (error) {
             logger.error(`Error listing documents from table ${tableName}:`, error);
             throw error;
@@ -336,15 +356,15 @@ class DBService {
         const selector = buildSelector(query);
         const mangoQuery = {
             selector,
-            fields: ["*"],
+            // fields: [],
             sort,
             skip,
             ...(limit ? {limit} : {})
         };
 
         try {
-            const result = await this.dbClient.use(tableName).find(mangoQuery);
-            return result.docs;
+            const result = await this.dbConnection.use(tableName).find(mangoQuery);
+            return processInChunks(result.docs, 2, (doc) => remapObject(doc));
         } catch (error) {
             logger.error(`Error filtering documents from table ${tableName}:`, error);
             throw error;

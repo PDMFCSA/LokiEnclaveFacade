@@ -33,12 +33,13 @@ const Tables = {
 
 const DBOperatorsMap = {
     "!=": "$ne",
-    "==": "$aeq",
-    ">": "$jgt",
-    ">=": "$jgte",
-    "<": "$jlt",
-    "<=": "$jlte",
-    "like": "$regex"
+    "==": "$eq",
+    ">": "$gt",
+    ">=": "$gte",
+    "<": "$lt",
+    "<=": "$lte",
+    "like": "$regex",
+    "||": "$or"
 };
 
 module.exports = {

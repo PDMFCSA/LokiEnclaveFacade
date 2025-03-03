@@ -12,8 +12,14 @@ const {DBKeys, SortOrder, DBOperatorsMap} = require("./constants");
  * @throws {Error} If the provided value is not a valid integer.
  */
 function normalizeNumber(value, min, defaultValue) {
+    if (typeof min !== 'number')
+        throw new TypeError("min must be a number.");
+
+    if (defaultValue !== null && defaultValue !== undefined && typeof defaultValue !== 'number')
+        throw new TypeError("defaultValue must be a number if provided.");
+
     if (value === null || value === undefined)
-        return defaultValue;
+        return (defaultValue < min) ? min : defaultValue;
 
     const num = Number(value);
     if (!Number.isInteger(num))
@@ -50,59 +56,112 @@ function validateSort(sort) {
     })
 }
 
-function parseConditionsToDBQuery(conditions) {
-    if (!conditions || conditions.length === 0 || conditions === "") {
-        return {};
+/**
+ * Validates if a query string uses only valid operators from DBOperatorsMap.
+ * @param {string} query - The query string to validate (e.g., "field1 >= 100").
+ * @returns {boolean} - Returns true if the query is valid, false otherwise.
+ */
+function validateQueryOperators(query) {
+    const operatorRegex = Object.keys(DBOperatorsMap)
+        .map(op => op.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) // Escape characters
+        .join("|");
+
+    const regex = new RegExp(`^(\\w+)\\s*(${operatorRegex})\\s*(.*)$`, "i");
+    return regex.test(query);
+}
+
+
+const isNumeric = (value) => !isNaN(value) && !isNaN(parseFloat(value));
+const isBoolean = (value) => typeof value === "string" && (value.toLowerCase() === "true" || value.toLowerCase() === "false");
+
+/**
+ * Parses a given value to its appropriate type.
+ * @param {string} value - The value to be parsed.
+ * @returns {number|string|boolean} - Parsed value
+ */
+function parseValue(value) {
+    value = typeof value === "string" ? value.trim() : value;
+    if (isNumeric(value))
+        return parseFloat(`${value}`)
+    if (isBoolean(value))
+        return `${value}`.toLowerCase() === "true";
+    return value;
+}
+
+
+/**
+ * Builds a condition object for a field, operator, and value.
+ * @param {string} field - The field name.
+ * @param {string} operator - The operator (e.g., ">=", "==", "like").
+ * @param {string} value - The value to compare.
+ * @returns {Object} - A condition object in the format { field: { operator: value } }.
+ * @throws {Error} - Throws an error if the operator is invalid or the value is invalid for regex.
+ */
+function buildCondition(field, operator, value) {
+    const mangoOperator = DBOperatorsMap[operator.toLowerCase().trim()];
+    if (!mangoOperator)
+        throw new Error(`Invalid operator: ${operator}`);
+
+    if (mangoOperator === DBOperatorsMap.like) {
+        try {
+            new RegExp(value.trim(), "i"); // Validate if the value is a valid regex
+        } catch (error) {
+            throw new Error(`Invalid regex value: ${value}`);
+        }
     }
-    // Array to store the conditions that will go into the $and structure
-    const andConditions = [];
-    conditions.forEach(condition => {
-        // Update regex pattern to capture more complex patterns for LIKE
-        const match = condition.match(/^(\w+)\s*(>=|<=|==|!=|<>|>|<|like)\s*(.*)$/i);
-        if (!match) {
-            throw new Error(`Invalid condition: ${condition}`);
+
+    return {
+        [field]: {
+            [mangoOperator]: parseValue(value)
         }
-
-        const [, field, operator, value] = match;
-        const dbOperator = DBOperatorsMap[operator.toLowerCase()];
-
-        let conditionObject = {};
-
-        if (operator.toLowerCase() === "like") {
-            // Process LIKE condition, and allow complex regex patterns
-            conditionObject[field] = {[dbOperator]: new RegExp(value.trim(), 'i')}; // case-insensitive regex
-        } else {
-            // Process other operators, handling numeric and string cases
-            const numericValue = parseFloat(value);
-            conditionObject[field] = {
-                [dbOperator]: isNaN(numericValue) ? value.replace(/['"]/g, '').trim() : numericValue
-            };
-        }
-
-        andConditions.push(conditionObject);
-    });
-
-    return {$and: andConditions};
+    };
 }
 
+/**
+ * Parses a query part (e.g., "field >= 100") into a condition object.
+ * @param {string} queryPart - The query part (e.g., "field >= 100" || field2 <= 100").
+ * @returns {Object} - A condition object (can be $or or a simple condition).
+ * @throws {Error} - Throws an error if the query part is malformed.
+ */
+function parseQueryPart(queryPart) {
+    if (queryPart.includes("||")) {
+        // If it contains "||", treat it as an OR condition
+        const orConditions = queryPart
+            .split("||")
+            .map(part => {
+                part = part.trim();
+                const [field, operator, value] = part.split(/\s+/);
+                if (!field || !operator || !value)
+                    throw new Error(`Malformed query part: ${part}`);
+                return buildCondition(field, operator, value);
+            });
+        return {$or: orConditions};
+    } else {
+        // Otherwise, treat it as a simple AND condition
+        const [field, operator, value] = queryPart.split(/\s+/);
+        if (!field || !operator || !value) {
+            throw new Error(`Malformed query part: ${queryPart}`);
+        }
+        return buildCondition(field, operator, value);
+    }
+}
+
+/**
+ * Converts an array of query strings into a selector object.
+ * @param {string[]} query - Array of strings in the format "field operator value" or "field1 operator value1 || field2 operator value2".
+ * @returns {Object} - A selector object in the format { $and: [...] } or an empty object if the array is empty.
+ * @throws {Error} - Throws an error if the input is not a valid array.
+ */
 function buildSelector(query) {
-    const selector = {};
-    query.forEach(q => {
-        const [field, operator, value] = q.split(/\s+/);
-        const mangoOperator = DBOperatorsMap[operator];
+    if (!Array.isArray(query) || !query.every(item => typeof item === "string" && validateQueryOperators(item)))
+        throw new Error("Query must be an array of valid condition strings");
 
-        if (!mangoOperator)
-            throw new Error(`Invalid operator: ${operator}`);
+    if (query.length === 0)
+        return {};
 
-        if (mangoOperator === "$regex") {
-            // selector[field] = { [mangoOperator]: `.*${value}.*` };
-            selector[field] = { [mangoOperator]: new RegExp(value.trim(), 'i') };
-        } else {
-            selector[field] = { [mangoOperator]: value };
-        }
-    });
-
-    return selector;
+    const conditions = query.map(parseQueryPart);
+    return {$and: conditions};
 }
 
-module.exports = {normalizeNumber, validateSort, buildSelector};
+
+module.exports = {normalizeNumber, validateSort, parseValue, buildSelector};
