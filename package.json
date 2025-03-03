@@ -7,7 +7,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "jest"
+    "test": "jest --verbose --runInBand --detectOpenHandles"
   },
   "repository": {
     "type": "git",
@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/OpenDSU/LokiEnclaveFacade#readme",
   "dependencies": {
+    "double-check": "^0.2.1",
     "nano": "^10.1.4"
   },
   "devDependencies": {
