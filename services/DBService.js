@@ -357,23 +357,31 @@ class DBService {
     /**
      * Lists documents from a specified table.
      *
-     * @param {string} tableName - The name of the table to fetch documents from.
+     * @param {string} dbName - THIS SHOULD BE THE TABLE BUT IT IS THE DBNAME. The name of the table to fetch documents from.
      * @param {Object} [options={}] - Optional configuration object for listing documents.
      * @param {number} [options.limit] - The maximum number of documents to fetch (optional).
      * @returns {Promise<Array<{ [key: string]: any }>>} - A promise that resolves to an array of document objects.
      * @throws {Error} - Throws an error if the query fails.
      */
-    async listDocuments(tableName, options = {}) {
+    async listDocuments(dbName, options = {}) {
         const {limit} = options;
+        dbName = changeDBNameToLowerCaseAndValidate(dbName);
+        
         try {
-            const queryOptions = {include_docs: true};
+            const queryOptions = {
+                include_docs: true,
+                startkey: '',
+                endkey: '_design/',
+                inclusive_end: false // Exclude design docs
+            };
+
             if (limit && Number.isInteger(limit) && limit > 0)
                 queryOptions.limit = limit;
 
-            const response = await this.dbConnection.use(tableName).list(queryOptions);
+            const response = await this.dbConnection.use(dbName).list(queryOptions);
             return processInChunks(response.rows, 2, (row) => remapObject(row.doc));
         } catch (error) {
-            logger.error(`Error listing documents from table ${tableName}:`, error);
+            logger.error(`Error listing documents from table ${dbName}:`, error);
             throw error;
         }
     }
