@@ -365,8 +365,8 @@ class DBService {
      */
     async listDocuments(dbName, options = {}) {
         const {limit} = options;
-        dbName = changeDBNameToLowerCaseAndValidate(dbName);
-        
+        dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
+
         try {
             const queryOptions = {
                 include_docs: true,
