@@ -46,26 +46,36 @@ function LightDBAdapter(config) {
     /**
      * Creates a collection and sets indexes for it.
      *
-     * @param {string} tableName - The name of the database to create.
+     * @param {string} dbName - The name of the database to create.
      * @param {array<string>} indexes - An array of index objects to be created in the database.
      * @param {function(Error|null, string)} callback - A callback function that returns an error (if any) and the result message.
      */
-    this.createCollection = function (tableName, indexes, callback) {
-        dbService.createDatabase(tableName, indexes)
-            .then((response) => callback(undefined, {message: `Collection ${tableName} created`}))
+    this.createCollection = function (dbName, indexes, callback) {
+        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+
+        if(dbService.dbExists(dbName))
+            return callback(undefined, {message: `Collection ${dbName} Already Exists!`})
+
+        dbService.createDatabase(tdbName, indexes)
+            .then((response) => callback(undefined, {message: `Collection ${dbName} created`}))
             .catch((e) => callback(e, undefined));
     }
 
     /**
      * Removes a collection.
      *
-     * @param {string} tableName - The name of the database to create.
+     * @param {string} dbName - The name of the database to create.
      * @param {function(Error|null, {message: string})} callback - A callback function that returns an error (if any) and the result message.
      */
-    this.removeCollection = (tableName, callback) => {
-        dbService.deleteDatabase(tableName).then((r) => {
+    this.removeCollection = (dbName, callback) => {
+        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+
+        if(!dbService.dbExists(dbName))
+            return callback(undefined, {message: `Collection ${dbName} was removed!`})
+
+        dbService.deleteDatabase(dbName).then((r) => {
             // maintained backward compatibility: The saveDatabase method was previously called
-            callback(undefined, {message: `Database ${tableName} saved`});
+            callback(undefined, {message: `Collection ${dbName} was removed!`});
         }).catch((e) => callback(e));
     }
 
@@ -93,25 +103,29 @@ function LightDBAdapter(config) {
     /**
      * Adds an index to a specified table for a given property.
      *
-     * @param {string} tableName - The name of the table where the index will be added.
+     * @param {string} dbName - The name of the table where the index will be added.
      * @param {string} property - The property (field) on which the index will be created.
      * @param {function(Error|undefined, void)} callback
      */
-    this.addIndex = function (tableName, property, callback) {
-        dbService.addIndex(tableName, property)
+    this.addIndex = function (dbName, property, callback) {
+        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+
+        dbService.addIndex(dbName, property)
             .then((r) => callback(undefined))
-            .catch((e) => callback(createOpenDSUErrorWrapper(`Could not add index ${property} on ${tableName}`, e), undefined));
+            .catch((e) => callback(createOpenDSUErrorWrapper(`Could not add index ${property} on ${dbName}`, e), undefined));
     }
 
 
     /**
      * Counts the number of documents in a table.
      *
-     * @param {string} tableName
+     * @param {string} dbName
      * @param {function(Error|undefined, number)} callback
      */
-    this.count = function (tableName, callback) {
-        dbService.countDocs(tableName)
+    this.count = function (dbName, callback) {
+        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+
+        dbService.countDocs(dbName)
             .then((response) => callback(undefined, response))
             .catch((e) => callback(e, undefined));
     };
@@ -120,13 +134,15 @@ function LightDBAdapter(config) {
     /**
      * Inserts a record into the specified table.
      *
-     * @param {string} tableName - The table name where the record should be inserted.
+     * @param {string} dbName - The table name where the record should be inserted.
      * @param {string} pk - The record id (primary key)
      * @param {Object} record - The record to insert into the database.
      * @param {function(Error|undefined, { [key: string]: any })} callback
      */
-    this.insertRecord = (tableName, pk, record, callback) => {
-        dbService.insertDocument(tableName, pk, record)
+    this.insertRecord = (dbName, pk, record, callback) => {
+        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+
+        dbService.insertDocument(dbName, pk, record)
             .then((response) => callback(undefined, response))
             .catch((e) => callback(e, undefined));
     };
@@ -134,12 +150,14 @@ function LightDBAdapter(config) {
     /**
      * Get a record from the specified table.
      *
-     * @param {string} tableName - The table name from which the record will be retrieved.
+     * @param {string} dbName - The table name from which the record will be retrieved.
      * @param {string} pk - The record id (primary key)
      * @param {function(Error|undefined, { [key: string]: any })} callback
      */
-    this.getRecord = function (tableName, pk, callback) {
-        dbService.readDocument(tableName, pk)
+    this.getRecord = function (dbName, pk, callback) {
+        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+
+        dbService.readDocument(dbName, pk)
             .then((response) => callback(undefined, response))
             .catch((e) => callback(createOpenDSUErrorWrapper(`Could not find object with pk ${pk}`, e), undefined));
     };
@@ -147,40 +165,46 @@ function LightDBAdapter(config) {
     /**
      * Updates an existing record in the specified table.
      *
-     * @param {string} tableName - The name of the table where the record will be updated.
+     * @param {string} dbName - The name of the table where the record will be updated.
      * @param {string} pk - The record id (primary key)
      * @param {Object} record - The data to update the record (can be a full or partial update).
      * @param {function(Error|undefined, { [key: string]: any })} callback
      */
-    this.updateRecord = function (tableName, pk, record, callback) {
-        dbService.updateDocument(tableName, pk, record)
+    this.updateRecord = function (dbName, pk, record, callback) {
+        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+
+        dbService.updateDocument(dbName, pk, record)
             .then((response) => callback(undefined, response))
-            .catch((e) => callback(createOpenDSUErrorWrapper(` Could not insert record in table ${tableName} `, e)));
+            .catch((e) => callback(createOpenDSUErrorWrapper(` Could not insert record in table ${dbName} `, e)));
     };
 
     /**
      * Deletes an existing record in the specified table.
      *
-     * @param {string} tableName - The name of the table where the record will be deleted.
+     * @param {string} dbName - The name of the table where the record will be deleted.
      * @param {string} pk - The record id (primary key) to be deleted
      * @param {function(Error|undefined, {pk: string, [key: string]: any})} callback
      */
-    this.deleteRecord = function (tableName, pk, callback) {
-        dbService.deleteDocument(tableName, pk)
+    this.deleteRecord = function (dbName, pk, callback) {
+        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+
+        dbService.deleteDocument(dbName, pk)
             .then((response) => callback(undefined, response))
-            .catch((e) => callback(createOpenDSUErrorWrapper(`Couldn't do remove for pk ${pk} in ${tableName}`, e)));
+            .catch((e) => callback(createOpenDSUErrorWrapper(`Couldn't do remove for pk ${pk} in ${dbName}`, e)));
     };
 
     /**
      * Filters records in the specified table based on given conditions.
      *
-     * @param {string} tableName - The name of the table to query.
+     * @param {string} dbName - The name of the table to query.
      * @param {Object} filterConditions - The conditions to filter records by.
      * @param {"asc" | "dsc"} [sort] - Optional sorting criteria.
      * @param {number} [max] - Optional maximum number of records to return.
      * @param {function(Error|undefined, Array<{[key: string]: any }>)} callback
      */
-    this.filter = function (tableName, filterConditions, sort, max, callback) {
+    this.filter = function (dbName, filterConditions, sort, max, callback) {
+        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+
         if (typeof filterConditions === "string") {
             filterConditions = [filterConditions];
         }
@@ -210,9 +234,10 @@ function LightDBAdapter(config) {
         const sortingField = getSortingKeyFromCondition(filterConditions);
         filterConditions = parseConditionsToDBQuery(filterConditions);
 
-        const table = dbService.openDatabase(tableName);
-        // if (!table)
-        //     return callback(undefined, []);
+        const db = dbService.openDatabase(dbName);
+        
+        if (!db)
+            return callback(undefined, []);
 
         let direction = false;
         if (sort === "desc" || sort === "dsc") {
@@ -221,9 +246,9 @@ function LightDBAdapter(config) {
 
         let result;
         try {
-            result = table.chain().find(filterConditions).simplesort(sortingField, direction).limit(max).data();
+            result = db.find(filterConditions).simplesort(sortingField, direction).limit(max).data();
         } catch (err) {
-            return callback(createOpenDSUErrorWrapper(`Filter operation failed on ${tableName}`, err));
+            return callback(createOpenDSUErrorWrapper(`Filter operation failed on ${dbName}`, err));
         }
 
 
@@ -233,25 +258,29 @@ function LightDBAdapter(config) {
     /**
      * Retrieves a single record from the specified table.
      *
-     * @param {string} tableName - The table name from which the record will be retrieved.
+     * @param {string} dbName - The table name from which the record will be retrieved.
      * @param {function(Error|undefined, {[key: string]: any})} callback
      */
-    this.getOneRecord = function (tableName, callback) {
-        dbService.listDocuments(tableName, {limit: 1})
+    this.getOneRecord = function (dbName, callback) {
+        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+
+        dbService.listDocuments(dbName, {limit: 1})
             .then((response) => callback(undefined, response))
-            .catch((e) => callback(createOpenDSUErrorWrapper(`Failed to fetch record from ${tableName}`, e)));
+            .catch((e) => callback(createOpenDSUErrorWrapper(`Failed to fetch record from ${dbName}`, e)));
     }
 
     /**
      * Retrieves all records from the specified table.
      *
-     * @param {string} tableName - The table name from which the records will be retrieved.
+     * @param {string} dbName - The table name from which the records will be retrieved.
      * @param {function(Error|undefined, Array<{[key: string]: any}>)} callback
      */
-    this.getAllRecords = (tableName, callback) => {
-        dbService.listDocuments(tableName)
+    this.getAllRecords = (dbName, callback) => {
+        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+
+        dbService.listDocuments(dbName)
             .then((response) => callback(undefined, response))
-            .catch((e) => callback(createOpenDSUErrorWrapper(`Failed to fetch records from ${tableName}`, e)));
+            .catch((e) => callback(createOpenDSUErrorWrapper(`Failed to fetch records from ${dbName}`, e)));
     }
 
     // --------------------------------------------------------------------
