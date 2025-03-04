@@ -1,7 +1,6 @@
 const {
     Tables,
     Permissions,
-    parseConditionsToDBQuery,
     getSortingKeyFromCondition,
     safeParseKeySSI,
     generateUniqueId
@@ -33,6 +32,14 @@ function LightDBAdapter(uri) {
     const dbService = new DBService(uri);
     const persistence = aclAPI.createEnclavePersistence(this);
     utils.bindAutoPendingFunctions(this);
+
+    function parseConditionsToDBQuery(conditions) {
+        if (!conditions || conditions.length === 0 || conditions === "") {
+            return {};
+        }
+
+        return {}
+    }
 
     /**
      * Creates a collection and sets indexes for it.
