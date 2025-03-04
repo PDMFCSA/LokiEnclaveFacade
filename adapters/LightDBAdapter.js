@@ -654,5 +654,5 @@ function LightDBAdapter(uri) {
     }
 }
 
-
-module.exports = {LightDBAdapter};
+LightDBAdapter.prototype.Adapters = {};
+module.exports = LightDBAdapter;

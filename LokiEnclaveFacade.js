@@ -1,7 +1,7 @@
 function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunction) {
     const logger = $$.getLogger("LokiEnclaveFacade", "LokiEnclaveFacade.js");
     const LokiDb = require("./LokiDb");
-    const {LightDBAdapter} = require("./adapters");
+    const LightDBAdapter = require("./adapters/LightDBAdapter");
     const openDSU = require("opendsu");
     const aclAPI = require("acl-magic");
     const utils = openDSU.loadAPI("utils");
@@ -178,12 +178,12 @@ function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunct
 
     utils.bindAutoPendingFunctions(this, ["on", "off", "dispatchEvent", "beginBatch", "isInitialised", "getEnclaveType", "getDID", "getUniqueIdAsync"]);
 
-    this.storageDB = new LokiDb(rootFolder, autosaveInterval, adaptorConstructorFunction);
-    // this.storageDB = new LightDBAdapter({
-    //     uri: "http://localhost:5984",
-    //     username: "",
-    //     secret: ""
-    // });
+    // this.storageDB = new LokiDb(rootFolder, autosaveInterval, adaptorConstructorFunction);
+    this.storageDB = new LightDBAdapter({
+        uri: "http://localhost:5984",
+        username: "admin",
+        secret: "adminpw"
+    });
     this.finishInitialisation();
 }
 
