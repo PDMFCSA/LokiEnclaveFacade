@@ -43,12 +43,40 @@ class DBService {
     }
 
     /**
+     * Checks if DB Name is valid for couch db.
+     * @param {string} dbName
+     * @returns {boolean} - `true` if the database name is valid, `false` otherwise.
+     */
+    isValidCouchDbName (dbName) {
+        const couchDbNameRegex = /^[a-z][a-z0-9_\$\(\)\+\-]{0,254}$/;
+        return couchDbNameRegex.test(dbName);
+    }
+
+    /**
+     * Converts to lower case and checks if DB Name is valid for couch db.
+     * @param {string} dbName
+     * @returns {boolean} - `true` if the database name is valid, `false` otherwise.
+     */
+    changeDBNameToLowerCaseAndValidate(dbName){
+        dbName = dbName.toLowerCase();
+
+        if(!this.isValidCouchDbName(dbName)) {
+            const message = `Invalid db name "${dbName}". Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, (, ), +, -, and / are allowed. Must begin with a letter.`
+            logger.error(message);
+            throw new Error(message);
+        }
+
+        return dbName;
+    }
+    
+    /**
      * Checks if a database exists.
      * @param {string} dbName
      * @returns {Promise<boolean>} - `true` if the database exists, `false` otherwise.
      */
     async dbExists(dbName) {
         try {
+            dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
             const dbList = await this.dbConnection.db.list();
             return dbList.includes(dbName);
         } catch (error) {
@@ -67,6 +95,7 @@ class DBService {
      */
     async createDatabase(dbName, indexes = []) {
         try {
+            dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
             if (await this.dbExists(dbName))
                 throw new Error(`Database "${dbName}" already exists.`);
 
@@ -92,6 +121,7 @@ class DBService {
      */
     async openDatabase(dbName) {
         try {
+            dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
             if (await this.dbExists(dbName))
                 return this.dbConnection.use(dbName);
 
@@ -112,6 +142,7 @@ class DBService {
      */
     async deleteDatabase(dbName) {
         try {
+            dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
             await this.dbConnection.db.destroy(dbName);
             return true;
         } catch (error) {
