@@ -58,7 +58,7 @@ class DBService {
      * @returns {boolean} - `true` if the database name is valid, `false` otherwise.
      */
     changeDBNameToLowerCaseAndValidate(dbName){
-        dbName = dbName.toLowerCase();
+        dbName =  dbName.toLowerCase().replaceAll(':', '_');
 
         if(!this.isValidCouchDbName(dbName)) {
             const message = `Invalid db name "${dbName}". Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, (, ), +, -, and / are allowed. Must begin with a letter.`
