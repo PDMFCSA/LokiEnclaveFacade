@@ -34,6 +34,7 @@ function LightDBAdapter(config) {
     const persistence = aclAPI.createEnclavePersistence(this);
     utils.bindAutoPendingFunctions(this);
 
+    //TODO: Base imp need real logic
     function parseConditionsToDBQuery(conditions) {
         if (!conditions || conditions.length === 0 || conditions === "") {
             return {};
