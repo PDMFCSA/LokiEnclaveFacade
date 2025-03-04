@@ -16,7 +16,7 @@ function createOpenDSUErrorWrapper(msg, error) {
     return error || msg;
 }
 
-function LightDBAdapter(uri) {
+function LightDBAdapter(config) {
     const logger = $$.getLogger("LightDBAdapter", "LightDBAdapter");
     const openDSU = require("opendsu");
     const aclAPI = require("acl-magic");
@@ -24,12 +24,13 @@ function LightDBAdapter(uri) {
     const w3cDID = openDSU.loadAPI("w3cdid");
     const utils = openDSU.loadAPI("utils");
     const CryptoSkills = w3cDID.CryptographicSkills;
+    const baseConfig = config;
 
-    logger.info(`Initializing CouchDB instance for ${uri}`);
-    if (typeof uri === "undefined")
+    logger.info(`Initializing CouchDB instance for ${JSON.stringify(config)}`);
+    if (typeof config.uri === "undefined")
         throw Error("URI was not specified for LightDBAdapter");
 
-    const dbService = new DBService(uri);
+    const dbService = new DBService(config);
     const persistence = aclAPI.createEnclavePersistence(this);
     utils.bindAutoPendingFunctions(this);
 
@@ -38,7 +39,7 @@ function LightDBAdapter(uri) {
             return {};
         }
 
-        return {}
+        return {};
     }
 
     /**
@@ -657,7 +658,7 @@ function LightDBAdapter(uri) {
      */
     this.saveDatabase = (callback) => {
         logger.warn(`Deprecated method. LightDBAdapter.saveDatabase called.`);
-        callback(undefined, {message: `Database ${uri} saved`});
+        callback(undefined, {message: `Database ${baseConfig.uri} saved`});
     }
 }
 
