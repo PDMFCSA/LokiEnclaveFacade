@@ -387,7 +387,8 @@ class DBService {
     }
 
 
-    async filter(tableName, query, sort = [], limit = undefined, skip = 0) {
+    async filter(dbName, query, sort = [], limit = undefined, skip = 0) {
+        dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
         limit = normalizeNumber(limit, 1, undefined);
         skip = normalizeNumber(skip, 0, 0);
         sort = validateSort(sort);
@@ -402,10 +403,10 @@ class DBService {
         };
 
         try {
-            const result = await this.dbConnection.use(tableName).find(mangoQuery);
+            const result = await this.dbConnection.use(dbName).find(mangoQuery);
             return processInChunks(result.docs, 2, (doc) => remapObject(doc));
         } catch (error) {
-            logger.error(`Error filtering documents from table ${tableName}:`, error);
+            logger.error(`Error filtering documents from table ${dbName}:`, error);
             throw error;
         }
     }
