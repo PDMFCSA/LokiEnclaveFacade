@@ -43,12 +43,40 @@ class DBService {
     }
 
     /**
+     * Checks if DB Name is valid for couch db.
+     * @param {string} dbName
+     * @returns {boolean} - `true` if the database name is valid, `false` otherwise.
+     */
+    isValidCouchDbName (dbName) {
+        const couchDbNameRegex = /^[a-z][a-z0-9_\$\(\)\+\-]{0,254}$/;
+        return couchDbNameRegex.test(dbName);
+    }
+
+    /**
+     * Converts to lower case and checks if DB Name is valid for couch db.
+     * @param {string} dbName
+     * @returns {boolean} - `true` if the database name is valid, `false` otherwise.
+     */
+    changeDBNameToLowerCaseAndValidate(dbName){
+        dbName =  dbName.toLowerCase().replaceAll(':', '_');
+
+        if(!this.isValidCouchDbName(dbName)) {
+            const message = `Invalid db name "${dbName}". Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, (, ), +, -, and / are allowed. Must begin with a letter.`
+            logger.error(message);
+            throw new Error(message);
+        }
+
+        return dbName;
+    }
+    
+    /**
      * Checks if a database exists.
      * @param {string} dbName
      * @returns {Promise<boolean>} - `true` if the database exists, `false` otherwise.
      */
     async dbExists(dbName) {
         try {
+            dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
             const dbList = await this.dbConnection.db.list();
             return dbList.includes(dbName);
         } catch (error) {
@@ -67,6 +95,7 @@ class DBService {
      */
     async createDatabase(dbName, indexes = []) {
         try {
+            dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
             if (await this.dbExists(dbName))
                 throw new Error(`Database "${dbName}" already exists.`);
 
@@ -92,6 +121,7 @@ class DBService {
      */
     async openDatabase(dbName) {
         try {
+            dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
             if (await this.dbExists(dbName))
                 return this.dbConnection.use(dbName);
 
@@ -112,6 +142,7 @@ class DBService {
      */
     async deleteDatabase(dbName) {
         try {
+            dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
             await this.dbConnection.db.destroy(dbName);
             return true;
         } catch (error) {
@@ -326,29 +357,38 @@ class DBService {
     /**
      * Lists documents from a specified table.
      *
-     * @param {string} tableName - The name of the table to fetch documents from.
+     * @param {string} dbName - THIS SHOULD BE THE TABLE BUT IT IS THE DBNAME. The name of the table to fetch documents from.
      * @param {Object} [options={}] - Optional configuration object for listing documents.
      * @param {number} [options.limit] - The maximum number of documents to fetch (optional).
      * @returns {Promise<Array<{ [key: string]: any }>>} - A promise that resolves to an array of document objects.
      * @throws {Error} - Throws an error if the query fails.
      */
-    async listDocuments(tableName, options = {}) {
+    async listDocuments(dbName, options = {}) {
         const {limit} = options;
+        dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
+
         try {
-            const queryOptions = {include_docs: true};
+            const queryOptions = {
+                include_docs: true,
+                startkey: '',
+                endkey: '_design/',
+                inclusive_end: false // Exclude design docs
+            };
+
             if (limit && Number.isInteger(limit) && limit > 0)
                 queryOptions.limit = limit;
 
-            const response = await this.dbConnection.use(tableName).list(queryOptions);
+            const response = await this.dbConnection.use(dbName).list(queryOptions);
             return processInChunks(response.rows, 2, (row) => remapObject(row.doc));
         } catch (error) {
-            logger.error(`Error listing documents from table ${tableName}:`, error);
+            logger.error(`Error listing documents from table ${dbName}:`, error);
             throw error;
         }
     }
 
 
-    async filter(tableName, query, sort = [], limit = undefined, skip = 0) {
+    async filter(dbName, query, sort = [], limit = undefined, skip = 0) {
+        dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
         limit = normalizeNumber(limit, 1, undefined);
         skip = normalizeNumber(skip, 0, 0);
         sort = validateSort(sort);
@@ -363,10 +403,10 @@ class DBService {
         };
 
         try {
-            const result = await this.dbConnection.use(tableName).find(mangoQuery);
+            const result = await this.dbConnection.use(dbName).find(mangoQuery);
             return processInChunks(result.docs, 2, (doc) => remapObject(doc));
         } catch (error) {
-            logger.error(`Error filtering documents from table ${tableName}:`, error);
+            logger.error(`Error filtering documents from table ${dbName}:`, error);
             throw error;
         }
     }
