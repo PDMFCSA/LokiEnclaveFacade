@@ -358,18 +358,18 @@ class DBService {
     /**
      * Lists documents from a specified table.
      *
-     * @param {string} dbName - THIS SHOULD BE THE TABLE BUT IT IS THE DBNAME. The name of the table to fetch documents from.
+     * @param {string} tableName - The name of the table to fetch documents from.
      * @param {Object} [options={}] - Optional configuration object for listing documents.
      * @param {number} [options.limit] - The maximum number of documents to fetch (optional).
      * @returns {Promise<Array<{ [key: string]: any }>>} - A promise that resolves to an array of document objects.
      * @throws {Error} - Throws an error if the query fails.
      */
-    async listDocuments(dbName, options = {}) {
+    async listDocuments(tableName, options = {}) {
         const {limit} = options;
-        dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
-        await this.openDatabase(dbName);
+        tableName = this.changeDBNameToLowerCaseAndValidate(tableName);
 
         try {
+            await this.openDatabase(tableName);
             const queryOptions = {
                 include_docs: true,
                 startkey: '',
@@ -380,17 +380,28 @@ class DBService {
             if (limit && Number.isInteger(limit) && limit > 0)
                 queryOptions.limit = limit;
 
-            const response = await this.dbConnection.use(dbName).list(queryOptions);
+            const response = await this.dbConnection.use(tableName).list(queryOptions);
             return processInChunks(response.rows, 2, (row) => remapObject(row.doc));
         } catch (error) {
-            logger.error(`Error listing documents from table ${dbName}:`, error);
+            logger.error(`Error listing documents from table ${tableName}:`, error);
             throw error;
         }
     }
 
-
-    async filter(dbName, query, sort = [], limit = undefined, skip = 0) {
-        dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
+    /**
+     * Filters documents from specified table.
+     *
+     * @async
+     * @param {string} tableName - The name of the table to query.
+     * @param {Array<string>} query - The query object to filter documents.
+     * @param {Array<Object>} [sort=[]] - Sorting criteria for the results.
+     * @param {number} [limit=undefined] - Maximum number of documents to return.
+     * @param {number} [skip=0] - Number of documents to skip before returning results.
+     * @returns {Promise<Array<Object>>}g.
+     * @throws {Error} If there is an issue querying the database.
+     */
+    async filter(tableName, query, sort = [], limit = undefined, skip = 0) {
+        tableName = this.changeDBNameToLowerCaseAndValidate(tableName);
         limit = normalizeNumber(limit, 1, undefined);
         skip = normalizeNumber(skip, 0, 0);
         sort = validateSort(sort);
@@ -405,10 +416,10 @@ class DBService {
         };
 
         try {
-            const result = await this.dbConnection.use(dbName).find(mangoQuery);
+            const result = await this.dbConnection.use(tableName).find(mangoQuery);
             return processInChunks(result.docs, 2, (doc) => remapObject(doc));
         } catch (error) {
-            logger.error(`Error filtering documents from table ${dbName}:`, error);
+            logger.error(`Error filtering documents from table ${tableName}:`, error);
             throw error;
         }
     }
