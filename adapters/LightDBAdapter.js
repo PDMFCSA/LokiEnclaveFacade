@@ -245,15 +245,18 @@ function LightDBAdapter(config) {
             direction = true;
         }
 
-        let result;
-        try {
-            result = db.find(filterConditions).simplesort(sortingField, direction).limit(max).data();
-        } catch (err) {
-            return callback(createOpenDSUErrorWrapper(`Filter operation failed on ${dbName}`, err));
-        }
+        // let result;
+        // try {
+        //     result = db.find(filterConditions).simplesort(sortingField, direction).limit(max).data();
+        // } catch (err) {
+        //     return callback(createOpenDSUErrorWrapper(`Filter operation failed on ${dbName}`, err));
+        // }
 
-
-        callback(null, result);
+        // TODO: Add filter
+        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+        dbService.filter(dbName, {})
+            .then((response) => callback(undefined, response))
+            .catch((e) => callback(createOpenDSUErrorWrapper(`Filter operation failed on ${dbName}`, e)));
     }
 
     /**

@@ -281,6 +281,7 @@ class DBService {
      */
     async readDocument(tableName, _id) {
         try {
+            await this.openDatabase(tableName);
             const document = await this.dbConnection.use(tableName).get(_id);
             return remapObject(document);
         } catch (error) {
@@ -366,6 +367,7 @@ class DBService {
     async listDocuments(dbName, options = {}) {
         const {limit} = options;
         dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
+        await this.openDatabase(dbName);
 
         try {
             const queryOptions = {
