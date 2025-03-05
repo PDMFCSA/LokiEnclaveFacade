@@ -27,7 +27,7 @@ function LightDBAdapter(config) {
     const CryptoSkills = w3cDID.CryptographicSkills;
     const baseConfig = config;
 
-    logger.info(`Initializing CouchDB instance for ${JSON.stringify(config)}`);
+    logger.info(`Initializing CouchDB instance.`);
     if (typeof config.uri === "undefined")
         throw Error("URI was not specified for LightDBAdapter");
 
