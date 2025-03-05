@@ -178,12 +178,12 @@ function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunct
 
     utils.bindAutoPendingFunctions(this, ["on", "off", "dispatchEvent", "beginBatch", "isInitialised", "getEnclaveType", "getDID", "getUniqueIdAsync"]);
 
-    this.storageDB = new LokiDb(rootFolder, autosaveInterval, adaptorConstructorFunction);
-    // this.storageDB = new LightDBAdapter({
-    //     uri: "http://localhost:5984",
-    //     username: "",
-    //     secret: ""
-    // });
+    // this.storageDB = new LokiDb(rootFolder, autosaveInterval, adaptorConstructorFunction);
+    this.storageDB = new LightDBAdapter({
+        uri: "http://localhost:5984",
+        username: "admin",
+        secret: "password"
+    });
     this.finishInitialisation();
 }
 
