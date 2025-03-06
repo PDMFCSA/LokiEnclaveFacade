@@ -56,6 +56,12 @@ function LightDBAdapter(config) {
      * @param {function(Error|null, string)} callback - A callback function that returns an error (if any) and the result message.
      */
     this.createCollection = function (forDID, dbName, indexes, callback) {
+        if (!callback) {
+            callback = indexes;
+            indexes = [];
+            dbName = forDID;
+            forDID = undefined;
+        }
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         if (dbService.dbExists(dbName))
@@ -73,7 +79,7 @@ function LightDBAdapter(config) {
      * @param {string} dbName - The name of the database to create.
      * @param {function(Error|null, {message: string})} callback - A callback function that returns an error (if any) and the result message.
      */
-    this.removeCollection =  (did, dbName, callback) => {
+    this.removeCollection = (did, dbName, callback) => {
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         if (!dbService.dbExists(dbName))
@@ -85,7 +91,7 @@ function LightDBAdapter(config) {
         }).catch((e) => callback(e));
     }
 
-    this.removeCollectionAsync =  (did, dbName) => {
+    this.removeCollectionAsync = (did, dbName) => {
         return new Promise((resolve, reject) => {
             this.removeCollection(did, dbName, (err, result) => err ? reject(err) : resolve(result));
         });
@@ -107,6 +113,10 @@ function LightDBAdapter(config) {
      * @param {function(Error|undefined, Array<string>)} callback
      */
     this.getCollections = (forDID, callback) => {
+        if (!callback) {
+            callback = forDID;
+            forDID = undefined;
+        }
         dbService.listDatabases(false)
             .then((response) => callback(undefined, response))
             .catch((e) => callback(e, undefined));
@@ -147,12 +157,17 @@ function LightDBAdapter(config) {
     /**
      * Inserts a record into the specified table.
      *
+     * @param {string} forDID
      * @param {string} dbName - The table name where the record should be inserted.
      * @param {string} pk - The record id (primary key)
      * @param {Object} record - The record to insert into the database.
      * @param {function(Error|undefined, { [key: string]: any })} callback
      */
-    this.insertRecord = (dbName, pk, record, callback) => {
+    this.insertRecord = (forDID, dbName, pk, record, callback) => {
+        if (!callback) {
+
+        }
+
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         dbService.insertDocument(dbName, pk, record)
@@ -282,7 +297,7 @@ function LightDBAdapter(config) {
         tableName = dbService.changeDBNameToLowerCaseAndValidate(tableName);
 
         dbService.listDocuments(tableName, {limit: 1})
-            .then((response) => callback(undefined, response))
+            .then((response) => callback(undefined, !response.length ? undefined : response))
             .catch((e) => callback(createOpenDSUErrorWrapper(`Failed to fetch record from ${tableName}`, e)));
     }
 
@@ -715,7 +730,7 @@ function LightDBAdapter(config) {
      * @returns {Promise<void>}
      * @deprecated This method is deprecated and will be removed in a future release. It does not perform any refresh operation.
      */
-    this.refreshAsync =  () => {
+    this.refreshAsync = () => {
         return Promise.resolve();
     }
 
