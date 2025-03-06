@@ -164,10 +164,6 @@ function LightDBAdapter(config) {
      * @param {function(Error|undefined, { [key: string]: any })} callback
      */
     this.insertRecord = (forDID, dbName, pk, record, callback) => {
-        if (!callback) {
-
-        }
-
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         dbService.insertDocument(dbName, pk, record)
@@ -743,11 +739,16 @@ function LightDBAdapter(config) {
     }
 
     /**
+     * @param {string} forDID
      * @param {function(undefined, {message: string}): void} callback
      * @returns {void}
      * @deprecated This method is deprecated and will be removed in a future release. It does not perform any operation.
      */
-    this.saveDatabase = (callback) => {
+    this.saveDatabase = (forDID, callback) => {
+        if (!callback) {
+            callback = forDID;
+            forDID = undefined;
+        }
         logger.warn(`Deprecated method. LightDBAdapter.saveDatabase called.`);
         callback(undefined, {message: `Database ${baseConfig.uri} saved`});
     }

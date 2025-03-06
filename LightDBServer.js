@@ -34,9 +34,9 @@ function LightDBServer(config, callback) {
     }
 
     const dbAdapter = new LightDBAdapter({
-        uri: "http://localhost:5984",
-        username: "admin",
-        secret: "adminpw"
+        uri: config.db.uri,
+        username: config.db.user,
+        secret: config.db.user
     });
 
 
