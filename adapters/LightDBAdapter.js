@@ -230,6 +230,15 @@ function LightDBAdapter(config) {
      * @param {function(Error|undefined, Array<{[key: string]: any }>)} callback
      */
     this.filter = function (dbName, filterConditions, sort, max, callback) {
+        if (!callback){
+            callback = max;
+            max = sort;
+            sort = filterConditions;
+            filterConditions = dbName;
+            dbName = forDid;
+            forDid = undefined;
+        }
+        
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         if (typeof filterConditions === "string") {
