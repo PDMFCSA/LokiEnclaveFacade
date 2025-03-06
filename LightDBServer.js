@@ -36,7 +36,7 @@ function LightDBServer(config, callback) {
     const dbAdapter = new LightDBAdapter({
         uri: config.db.uri,
         username: config.db.user,
-        secret: config.db.user
+        secret: config.db.secret
     });
 
 

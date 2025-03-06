@@ -184,7 +184,7 @@ function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunct
 
     let config;
     try {
-        const apihubPath = path.join(process.cwd, "..", "..", "apihub-root", "external-volume", "config", "apihub.json")
+        const apihubPath = path.join(process.cwd(), "..", "apihub-root", "external-volume", "config", "apihub.json")
         config = JSON.parse(fs.readFileSync(apihubPath));
     } catch (e) {
         throw new Error(`Failed to read apihub.json from: ${e.message || e}`);
