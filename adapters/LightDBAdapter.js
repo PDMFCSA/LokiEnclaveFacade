@@ -223,14 +223,13 @@ function LightDBAdapter(config) {
     /**
      * Filters records in the specified table based on given conditions.
      *
-     * @param {string} forDID
      * @param {string} dbName - The name of the table to query.
      * @param {Object} filterConditions - The conditions to filter records by.
      * @param {"asc" | "dsc"} [sort] - Optional sorting criteria.
      * @param {number} [max] - Optional maximum number of records to return.
      * @param {function(Error|undefined, Array<{[key: string]: any }>)} callback
      */
-    this.filter = function (forDID, dbName, filterConditions, sort, max, callback) {
+    this.filter = function (dbName, filterConditions, sort, max, callback) {
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         if (typeof filterConditions === "string") {
