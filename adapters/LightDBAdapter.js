@@ -174,11 +174,12 @@ function LightDBAdapter(config) {
     /**
      * Get a record from the specified table.
      *
+     * @param {string} forDID
      * @param {string} dbName - The table name from which the record will be retrieved.
      * @param {string} pk - The record id (primary key)
      * @param {function(Error|undefined, { [key: string]: any })} callback
      */
-    this.getRecord = function (dbName, pk, callback) {
+    this.getRecord = function (forDID, dbName, pk, callback) {
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         dbService.readDocument(dbName, pk)
@@ -189,12 +190,13 @@ function LightDBAdapter(config) {
     /**
      * Updates an existing record in the specified table.
      *
+     * @param {string} forDID
      * @param {string} dbName - The name of the table where the record will be updated.
      * @param {string} pk - The record id (primary key)
      * @param {Object} record - The data to update the record (can be a full or partial update).
      * @param {function(Error|undefined, { [key: string]: any })} callback
      */
-    this.updateRecord = function (dbName, pk, record, callback) {
+    this.updateRecord = function (forDID, dbName, pk, record, callback) {
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         dbService.updateDocument(dbName, pk, record)
@@ -205,11 +207,12 @@ function LightDBAdapter(config) {
     /**
      * Deletes an existing record in the specified table.
      *
+     * @param {string} forDID
      * @param {string} dbName - The name of the table where the record will be deleted.
      * @param {string} pk - The record id (primary key) to be deleted
      * @param {function(Error|undefined, {pk: string, [key: string]: any})} callback
      */
-    this.deleteRecord = function (dbName, pk, callback) {
+    this.deleteRecord = function (forDID, dbName, pk, callback) {
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         dbService.deleteDocument(dbName, pk)
@@ -220,13 +223,14 @@ function LightDBAdapter(config) {
     /**
      * Filters records in the specified table based on given conditions.
      *
+     * @param {string} forDID
      * @param {string} dbName - The name of the table to query.
      * @param {Object} filterConditions - The conditions to filter records by.
      * @param {"asc" | "dsc"} [sort] - Optional sorting criteria.
      * @param {number} [max] - Optional maximum number of records to return.
      * @param {function(Error|undefined, Array<{[key: string]: any }>)} callback
      */
-    this.filter = function (dbName, filterConditions, sort, max, callback) {
+    this.filter = function (forDID, dbName, filterConditions, sort, max, callback) {
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         if (typeof filterConditions === "string") {
