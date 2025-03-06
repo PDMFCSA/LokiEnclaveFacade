@@ -50,14 +50,15 @@ function LightDBAdapter(config) {
     /**
      * Creates a collection and sets indexes for it.
      *
+     * @param {string} forDID
      * @param {string} dbName - The name of the database to create.
      * @param {array<string>} indexes - An array of index objects to be created in the database.
      * @param {function(Error|null, string)} callback - A callback function that returns an error (if any) and the result message.
      */
-    this.createCollection = function (dbName, indexes, callback) {
+    this.createCollection = function (forDID, dbName, indexes, callback) {
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
-        if(dbService.dbExists(dbName))
+        if (dbService.dbExists(dbName))
             return callback(undefined, {message: `Collection ${dbName} Already Exists!`})
 
         dbService.createDatabase(tdbName, indexes)
@@ -68,19 +69,26 @@ function LightDBAdapter(config) {
     /**
      * Removes a collection.
      *
+     * @param {string} did
      * @param {string} dbName - The name of the database to create.
      * @param {function(Error|null, {message: string})} callback - A callback function that returns an error (if any) and the result message.
      */
-    this.removeCollection = (dbName, callback) => {
+    this.removeCollection =  (did, dbName, callback) => {
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
-        if(!dbService.dbExists(dbName))
+        if (!dbService.dbExists(dbName))
             return callback(undefined, {message: `Collection ${dbName} was removed!`})
 
         dbService.deleteDatabase(dbName).then((r) => {
             // maintained backward compatibility: The saveDatabase method was previously called
             callback(undefined, {message: `Collection ${dbName} was removed!`});
         }).catch((e) => callback(e));
+    }
+
+    this.removeCollectionAsync =  (did, dbName) => {
+        return new Promise((resolve, reject) => {
+            this.removeCollection(did, dbName, (err, result) => err ? reject(err) : resolve(result));
+        });
     }
 
     /**
@@ -95,9 +103,10 @@ function LightDBAdapter(config) {
     /**
      * Retrieves a list of collections
      *
+     * @param {string} forDID
      * @param {function(Error|undefined, Array<string>)} callback
      */
-    this.getCollections = (callback) => {
+    this.getCollections = (forDID, callback) => {
         dbService.listDatabases(false)
             .then((response) => callback(undefined, response))
             .catch((e) => callback(e, undefined));
@@ -265,15 +274,16 @@ function LightDBAdapter(config) {
     /**
      * Retrieves a single record from the specified table.
      *
-     * @param {string} dbName - The table name from which the record will be retrieved.
+     * @param {string} did - The table name from which the record will be retrieved.
+     * @param {string} tableName - The table name from which the record will be retrieved.
      * @param {function(Error|undefined, {[key: string]: any})} callback
      */
-    this.getOneRecord = function (dbName, callback) {
-        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
+    this.getOneRecord = (did, tableName, callback) => {
+        tableName = dbService.changeDBNameToLowerCaseAndValidate(tableName);
 
-        dbService.listDocuments(dbName, {limit: 1})
+        dbService.listDocuments(tableName, {limit: 1})
             .then((response) => callback(undefined, response))
-            .catch((e) => callback(createOpenDSUErrorWrapper(`Failed to fetch record from ${dbName}`, e)));
+            .catch((e) => callback(createOpenDSUErrorWrapper(`Failed to fetch record from ${tableName}`, e)));
     }
 
     /**
@@ -381,13 +391,14 @@ function LightDBAdapter(config) {
     /**
      * Add an Object to Queue.
      *
+     * @param {string} did
      * @param {string} queueName - The table name where the record should be inserted.
      * @param {*} encryptedObject - Object to be added to Queue
      * @param {boolean} ensureUniqueness - Whether to ensure uniqueness identifier
      * @param {function(Error|undefined, string)} callback
      * @returns {void}
      */
-    this.addInQueue = (queueName, encryptedObject, ensureUniqueness, callback) => {
+    this.addInQueue = (did, queueName, encryptedObject, ensureUniqueness, callback) => {
         if (typeof ensureUniqueness === "function") {
             callback = ensureUniqueness;
             ensureUniqueness = false;
@@ -400,12 +411,13 @@ function LightDBAdapter(config) {
 
     /**
      *
+     * @param {string} forDID
      * @param {string} queueName
      * @param {"asc" | "dsc"} sortAfterInsertTime
      * @param {number} onlyFirstN
      * @param {function(Error|undefined, Array<{[key: string]: any}>)} callback
      */
-    this.listQueue = (queueName, sortAfterInsertTime, onlyFirstN, callback) => {
+    this.listQueue = (forDID, queueName, sortAfterInsertTime, onlyFirstN, callback) => {
         if (typeof sortAfterInsertTime === "function") {
             callback = sortAfterInsertTime;
             sortAfterInsertTime = "asc";
@@ -431,31 +443,34 @@ function LightDBAdapter(config) {
     /**
      * Returns the Queue size.
      *
+     * @param {string} did
      * @param {string} queueName
      * @param {function(Error|undefined, number)} callback
      * @returns {void}
      */
-    this.queueSize = (queueName, callback) => this.count(queueName, callback);
+    this.queueSize = (did, queueName, callback) => this.count(queueName, callback);
 
     /**
      * Get an Object from the Queue.
      *
+     * @param {string} forDID
      * @param {string} queueName
      * @param {string} hash - The object hash/identifier
      * @param {function(Error|undefined, { [key: string]: any })} callback
      * @returns {void}
      */
-    this.getObjectFromQueue = (queueName, hash, callback) => this.getRecord(queueName, hash, callback);
+    this.getObjectFromQueue = (forDID, queueName, hash, callback) => this.getRecord(queueName, hash, callback);
 
     /**
      * Deletes an existing record in the Queue.
      *
+     * @param {string} forDID
      * @param {string} queueName
      * @param {string} hash - Queue record id
      * @param {function(Error|undefined, {pk: string, [key: string]: any})} callback
      * @returns {void}
      */
-    this.deleteObjectFromQueue = (queueName, hash, callback) => this.deleteRecord(queueName, hash, callback);
+    this.deleteObjectFromQueue = (forDID, queueName, hash, callback) => this.deleteRecord(queueName, hash, callback);
 
 
     // --------------------------------------------------------------------
@@ -697,6 +712,22 @@ function LightDBAdapter(config) {
     }
 
     /**
+     * @returns {Promise<void>}
+     * @deprecated This method is deprecated and will be removed in a future release. It does not perform any refresh operation.
+     */
+    this.refreshAsync =  () => {
+        return Promise.resolve();
+    }
+
+    /**
+     * @returns {boolean}
+     * @deprecated This method is deprecated and will be removed in a future release. It does not perform any refresh operation.
+     */
+    this.refreshInProgress = () => {
+        return false;
+    }
+
+    /**
      * @param {function(undefined, {message: string}): void} callback
      * @returns {void}
      * @deprecated This method is deprecated and will be removed in a future release. It does not perform any operation.
@@ -706,7 +737,7 @@ function LightDBAdapter(config) {
         callback(undefined, {message: `Database ${baseConfig.uri} saved`});
     }
 
-    this.allowedInReadOnlyMode = function (functionName){
+    this.allowedInReadOnlyMode = function (functionName) {
         let readOnlyFunctions = [
             "getCollections",
             "listQueue",
