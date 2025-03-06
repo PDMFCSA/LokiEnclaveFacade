@@ -1,5 +1,9 @@
+const LightDBAdapter = require("./adapters/LightDBAdapter");
+const path = require("path");
 const logger = $$.getLogger("LightDBServer", "LokiEnclaveFacade");
 const DATABASE = "database";
+const getEnclaveKey = (name) => `enclave_${name}`.replaceAll(".", "_");
+
 process.on('uncaughtException', err => {
     logger.critical('There was an uncaught error', err, err.message, err.stack);
 });
@@ -28,6 +32,14 @@ function LightDBServer(config, callback) {
     if (!config.storage) {
         config.storage = lightDBStorage;
     }
+
+    const dbAdapter = new LightDBAdapter({
+        uri: "http://localhost:5984",
+        username: "admin",
+        secret: "adminpw"
+    });
+
+
     const enclaves = {};
     const clonedEnclaves = {};
     const path = require("path");
@@ -37,28 +49,19 @@ function LightDBServer(config, callback) {
         const folderContent = fs.readdirSync(lightDBStorage, {withFileTypes: true});
         for (let entry of folderContent) {
             if (entry.isDirectory()) {
-                let enclaveName = entry.name;
-                logger.info(`Loading database ${enclaveName}`);
-                if (sqlConfig) {
-                    const SQLAdapter = require("lightDB-sql-adapter");
-                    enclaves[enclaveName] = SQLAdapter.createSQLAdapterInstance({
-                        ...sqlConfig,
-                        database: enclaveName  // Use the enclave name as the database name
-                    });
-                    clonedEnclaves[enclaveName] = SQLAdapter.createSQLAdapterInstance({
-                        ...sqlConfig,
-                        database: enclaveName
-                    });
-                } else {
-                    // For LokiDB, use the original filesystem-based approach
-                    enclaves[enclaveName] = LokiEnclaveFacade.createLokiEnclaveFacadeInstance(path.join(lightDBStorage, enclaveName, DATABASE));
-                    clonedEnclaves[enclaveName] = LokiEnclaveFacade.createLokiEnclaveFacadeInstance(path.join(lightDBStorage, enclaveName, DATABASE));
-                }
+                const enclaveName = entry.name;
+                // TODO - IMPROVE
+                const enclaveKey = getEnclaveKey(enclaveName);
+                dbAdapter.createCollection(enclaveKey, [], (err) => {
+                    if (err)
+                        throw new Error(err);
+                    enclaves[enclaveName] = enclaveKey;
+                    clonedEnclaves[enclaveName] = enclaveKey;
+                });
             }
         }
     } catch (err) {
-        logger.info(`Failed to access the storage folder: ${lightDBStorage}. Ensuring folder structure...`);
-        fs.mkdirSync(lightDBStorage, {recursive: true});
+        throw err;
     }
 
     let accessControlAllowHeaders = new Set();
@@ -223,27 +226,25 @@ function LightDBServer(config, callback) {
                     }
 
                     if (server.readOnlyModeActive) {
-                        if (enclaves[req.params.dbName].allowedInReadOnlyMode &&
-                            !enclaves[req.params.dbName].allowedInReadOnlyMode(command.commandName)) {
-
+                        if (dbAdapter.allowedInReadOnlyMode && dbAdapter.allowedInReadOnlyMode(command.commandName)) {
                             res.statusCode = 403;
                             res.end();
                             return;
                         }
 
                         //at this point we know that will execute a read cmd so first of all we need to ensure that a refresh is made if needed
-                        try {
-                            let lastRefresh = lastRefreshes[req.params.dbName];
-                            if (!lastRefresh || LAST_REFRESH_TIMEOUT < Date.now() - lastRefresh) {
-                                enclaves[req.params.dbName].refresh(undefined, (err) => {
-                                    clonedEnclaves[req.params.dbName].refresh(undefined, (err) => {
-                                        lastRefreshes[req.params.dbName] = Date.now();
-                                    });
-                                });
-                            }
-                        } catch (err) {
-                            //we ignore any refresh errors for now...
-                        }
+                        // try {
+                        //     let lastRefresh = lastRefreshes[req.params.dbName];
+                        //     if (!lastRefresh || LAST_REFRESH_TIMEOUT < Date.now() - lastRefresh) {
+                        //         enclaves[req.params.dbName].refresh(undefined, (err) => {
+                        //             clonedEnclaves[req.params.dbName].refresh(undefined, (err) => {
+                        //                 lastRefreshes[req.params.dbName] = Date.now();
+                        //             });
+                        //         });
+                        //     }
+                        // } catch (err) {
+                        //     //we ignore any refresh errors for now...
+                        // }
                     }
 
                     const cb = (err, result) => {
@@ -266,11 +267,12 @@ function LightDBServer(config, callback) {
 
                     // trying to capture any sync error that might occur during the execution of the command
                     try {
-                        if (enclaves[req.params.dbName].refreshInProgress()) {
-                            clonedEnclaves[req.params.dbName][command.commandName](...args);
-                        } else {
-                            enclaves[req.params.dbName][command.commandName](...args);
-                        }
+                        dbAdapter[command.commandName](...args);
+                        // if (enclaves[req.params.dbName].refreshInProgress()) {
+                        //     clonedEnclaves[req.params.dbName][command.commandName](...args);
+                        // } else {
+                        //     enclaves[req.params.dbName][command.commandName](...args);
+                        // }
                     } catch (e) {
                         cb(e);
                     }
@@ -303,27 +305,19 @@ function LightDBServer(config, callback) {
                 return;
             }
 
-            const storage = path.join(lightDBStorage, dbName);
-            logger.info(`Creating new Database at ${storage}`);
-            let fsModule = "fs";
-            fsModule = require(fsModule);
-            fsModule.mkdir(storage, {recursive: true}, (err) => {
+            const enclaveKey = getEnclaveKey(dbName);
+            dbAdapter.createCollection(enclaveKey, [], (err, result) => {
                 if (err) {
                     logger.error("Failed to create database", err);
                     res.statusCode = 500;
                     res.end();
                     return;
                 }
-                if (enclaves[dbName]) {
-                    logger.error("Race condition detected and resolved during lightDB database creation");
-                    res.statusCode = 409;
-                    res.write("Already exists");
-                    return res.end();
-                }
-                enclaves[dbName] = LokiEnclaveFacade.createLokiEnclaveFacadeInstance(path.join(storage, DATABASE));
+
+                enclaves[dbName] = enclaveKey;
                 res.statusCode = 201;
                 res.end();
-            })
+            });
         });
     }
 }

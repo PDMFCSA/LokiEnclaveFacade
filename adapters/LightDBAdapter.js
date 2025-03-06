@@ -27,6 +27,9 @@ function LightDBAdapter(config) {
     const CryptoSkills = w3cDID.CryptographicSkills;
     const baseConfig = config;
 
+    const EnclaveMixin = openDSU.loadAPI("enclave").EnclaveMixin;
+    EnclaveMixin(this);
+
     logger.info(`Initializing CouchDB instance.`);
     if (typeof config.uri === "undefined")
         throw Error("URI was not specified for LightDBAdapter");
@@ -321,43 +324,51 @@ function LightDBAdapter(config) {
     // --------------------------------------------------------------------
     // ACCESS METHODS
     // --------------------------------------------------------------------
-    this.grantWriteAccess = (callback) => {
-        persistence.grant(Permissions.WRITE_ACCESS, Permissions.WILDCARD, (err) => {
-            if (err)
+    this.grantWriteAccess = (forDID, callback) => {
+        persistence.grant(Permissions.WRITE_ACCESS, Permissions.WILDCARD, forDID, (err) => {
+            if (err) {
                 return callback(err);
-            this.grantReadAccess(callback);
+            }
+
+            this.grantReadAccess(forDID, callback);
         });
     }
 
-    this.hasWriteAccess = (callback) => {
-        persistence.loadResourceDirectGrants(Permissions.WRITE_ACCESS, (err, usersWithAccess) => {
-            if (err)
+    this.hasWriteAccess = (forDID, callback) => {
+        persistence.loadResourceDirectGrants(Permissions.WRITE_ACCESS, forDID, (err, usersWithAccess) => {
+            if (err) {
                 return callback(err);
+            }
+
             callback(undefined, usersWithAccess.indexOf(Permissions.WILDCARD) !== -1);
         });
     }
 
-    this.revokeWriteAccess = (callback) => {
-        persistence.ungrant(Permissions.WRITE_ACCESS, Permissions.WILDCARD, callback);
+    this.revokeWriteAccess = (forDID, callback) => {
+        persistence.ungrant(Permissions.WRITE_ACCESS, Permissions.WILDCARD, forDID, callback);
     }
 
-    this.grantReadAccess = (callback) => {
-        persistence.grant(Permissions.READ_ACCESS, Permissions.WILDCARD, callback);
+    this.grantReadAccess = (forDID, callback) => {
+        persistence.grant(Permissions.READ_ACCESS, Permissions.WILDCARD, forDID, callback);
     }
 
-    this.hasReadAccess = (callback) => {
-        persistence.loadResourceDirectGrants(Permissions.READ_ACCESS, (err, usersWithAccess) => {
-            if (err)
+    this.hasReadAccess = (forDID, callback) => {
+        persistence.loadResourceDirectGrants(Permissions.READ_ACCESS, forDID, (err, usersWithAccess) => {
+            if (err) {
                 return callback(err);
+            }
+
             callback(undefined, usersWithAccess.indexOf(Permissions.WILDCARD) !== -1);
         });
     }
 
-    this.revokeReadAccess = (callback) => {
-        persistence.ungrant(Permissions.READ_ACCESS, Permissions.WILDCARD, err => {
-            if (err)
+    this.revokeReadAccess = (forDID, callback) => {
+        persistence.ungrant(Permissions.READ_ACCESS, Permissions.WILDCARD, forDID, err => {
+            if (err) {
                 return callback(err);
-            this.revokeWriteAccess(callback);
+            }
+
+            this.revokeWriteAccess(forDID, callback);
         });
     }
 
@@ -693,6 +704,32 @@ function LightDBAdapter(config) {
     this.saveDatabase = (callback) => {
         logger.warn(`Deprecated method. LightDBAdapter.saveDatabase called.`);
         callback(undefined, {message: `Database ${baseConfig.uri} saved`});
+    }
+
+    this.allowedInReadOnlyMode = function (functionName){
+        let readOnlyFunctions = [
+            "getCollections",
+            "listQueue",
+            "queueSize",
+            "count",
+            "hasReadAccess",
+            "getPrivateInfoForDID",
+            "getCapableOfSigningKeySSI",
+            "getPathKeyMapping",
+            "getDID",
+            "getPrivateKeyForSlot",
+            "getIndexedFields",
+            "getRecord",
+            "getAllTableNames",
+            "filter",
+            "readKey",
+            "getAllRecords",
+            "getReadForKeySSI",
+            "verifyForDID",
+            "encryptMessage",
+            "decryptMessage"];
+
+        return readOnlyFunctions.indexOf(functionName) !== -1;
     }
 }
 
