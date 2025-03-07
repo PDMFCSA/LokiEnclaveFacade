@@ -96,8 +96,10 @@ class DBService {
     async createDatabase(dbName, indexes = []) {
         try {
             dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
-            if (await this.dbExists(dbName))
-                throw new Error(`Database "${dbName}" already exists.`);
+            if (await this.dbExists(dbName)) {
+                logger.info(`Database "${dbName}" already exists. Skipping creation...`);
+                return true;
+            }
 
             await this.dbConnection.db.create(dbName);
             logger.info(`Database "${dbName}" created successfully.`);
