@@ -184,11 +184,9 @@ function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunct
 
     let config;
     try {
-        const apihub = require("apihub");
-        const apihubPath = path.join(process.cwd(), "..", "apihub-root", "external-volume", "config", "apihub.json")
-        config = JSON.parse(fs.readFileSync(apihubPath));
+        config = require("apihub").getServerConfig();
     } catch (e) {
-        throw new Error(`Failed to read apihub.json. Error: ${e.message || e}}`);
+        throw new Error(`Failed to read apihub. Error: ${e.message || e}}`);
     }
 
     this.storageDB = new LightDBAdapter({

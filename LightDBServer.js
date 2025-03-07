@@ -38,9 +38,9 @@ function LightDBServer(config, callback) {
 
     const enclaves = {};
     // const clonedEnclaves = {};
-    //const fs = require("fs");
-    //fs.accessSync(lightDBStorage);
-    const folderContent = []; // fs.readdirSync(lightDBStorage, {withFileTypes: true});
+    const fs = require("fs");
+    fs.accessSync(lightDBStorage);
+    const folderContent = fs.readdirSync(lightDBStorage, {withFileTypes: true});
     const promises = folderContent
         .filter(entry => entry.isDirectory())
         .map(entry => {
