@@ -229,7 +229,7 @@ function LightDBAdapter(config) {
      * @param {number} [max] - Optional maximum number of records to return.
      * @param {function(Error|undefined, Array<{[key: string]: any }>)} callback
      */
-    this.filter = function (dbName, filterConditions, sort, max, callback) {
+    this.filter = function (forDid, dbName, filterConditions, sort, max, callback) {
         if (!callback){
             callback = max;
             max = sort;
@@ -289,9 +289,11 @@ function LightDBAdapter(config) {
 
         // TODO: Add filter
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
-        dbService.filter(dbName, {})
-            .then((response) => callback(undefined, response))
-            .catch((e) => callback(createOpenDSUErrorWrapper(`Filter operation failed on ${dbName}`, e)));
+        dbService.openDatabase(dbName).then(() => {
+            dbService.filter(dbName, {})
+                .then((response) => callback(undefined, response))
+                .catch((e) => callback(createOpenDSUErrorWrapper(`Filter operation failed on ${dbName}`, e)));
+        }).catch((e) => callback(e));
     }
 
     /**
@@ -315,7 +317,7 @@ function LightDBAdapter(config) {
      * @param {string} dbName - The table name from which the records will be retrieved.
      * @param {function(Error|undefined, Array<{[key: string]: any}>)} callback
      */
-    this.getAllRecords = (dbName, callback) => {
+    this.getAllRecords = (forDID, dbName, callback) => {
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         dbService.listDocuments(dbName)

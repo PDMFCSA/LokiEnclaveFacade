@@ -16,7 +16,6 @@ process.on('SIGTERM', (signal) => {
 function LightDBServer(config, callback) {
     let {lightDBStorage, lightDBPort, lightDBDynamicPort, host, sqlConfig} = config;
     const apihubModule = require("apihub");
-    const LokiEnclaveFacade = require("loki-enclave-facade");
     const httpWrapper = apihubModule.getHttpWrapper();
     const Server = httpWrapper.Server;
     const CHECK_FOR_RESTART_COMMAND_FILE_INTERVAL = 500;
