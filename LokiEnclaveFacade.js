@@ -184,6 +184,7 @@ function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunct
 
     let config;
     try {
+        const apihub = require("apihub");
         const apihubPath = path.join(process.cwd(), "..", "apihub-root", "external-volume", "config", "apihub.json")
         config = JSON.parse(fs.readFileSync(apihubPath));
     } catch (e) {
