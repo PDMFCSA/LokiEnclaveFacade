@@ -55,7 +55,7 @@ class DBService {
     /**
      * Converts to lower case and checks if DB Name is valid for couch db.
      * @param {string} dbName
-     * @returns {boolean} - `true` if the database name is valid, `false` otherwise.
+     * @returns {string} - dbName if the database name is valid, `false` otherwise.
      */
     changeDBNameToLowerCaseAndValidate(dbName){
         dbName =  dbName.toLowerCase().replaceAll(':', '_');
@@ -80,6 +80,7 @@ class DBService {
             const dbList = await this.dbConnection.db.list();
             return dbList.includes(dbName);
         } catch (error) {
+            this._testErrorForShutdown(error);
             logger.error(`Failed to check if database "${dbName}" exists:`, error);
             return false;
         }
@@ -109,6 +110,7 @@ class DBService {
 
             return true;
         } catch (err) {
+            this._testErrorForShutdown(err);
             logger.error(`Fail creating database or adding indexes for "${dbName}".`);
             throw err;
         }
@@ -132,6 +134,7 @@ class DBService {
             // TODO - Remove, return DBService instance
             return this.dbConnection.use(dbName);
         } catch (error) {
+            this._testErrorForShutdown(error);
             logger.error(`Error in openDatabase: ${error.message || error}`);
             throw error;
         }
@@ -148,6 +151,7 @@ class DBService {
             await this.dbConnection.db.destroy(dbName);
             return true;
         } catch (error) {
+            this._testErrorForShutdown(error);
             if (error.status === 404) {
                 logger.warn(`Database "${dbName}" does not exist. No deletion required.`);
                 return true;
@@ -183,8 +187,21 @@ class DBService {
             }
             return databaseInfoList;
         } catch (error) {
+            this._testErrorForShutdown(error);
             logger.error('Error listing databases:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Test is the error is worth shutting down the system for
+     * @param {Error} error
+     * @returns {void}
+     */
+    _testErrorForShutdown(error){
+        if (error.message.includes("ECONNREFUSED")){
+            logger.error("Failed to connect to couchdb instance. Shutting down the system...");
+            process.exit(1);
         }
     }
 
