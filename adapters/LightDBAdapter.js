@@ -318,6 +318,12 @@ function LightDBAdapter(config) {
      * @param {function(Error|undefined, Array<{[key: string]: any}>)} callback
      */
     this.getAllRecords = (forDID, dbName, callback) => {
+        if (!callback) {
+            callback = dbName;
+            dbName = forDID;
+            forDID = undefined;
+        }
+
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         dbService.listDocuments(dbName)
