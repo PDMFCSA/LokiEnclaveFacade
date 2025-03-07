@@ -62,14 +62,20 @@ function LightDBAdapter(config) {
             dbName = forDID;
             forDID = undefined;
         }
+        // if (dbName === "audit"){
+        //     if (!forDID)
+        //         return callback("Missing did for audit db");
+        //     dbName = [dbName, forDID].join("_");
+        // }
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
-        if (dbService.dbExists(dbName))
-            return callback(undefined, {message: `Collection ${dbName} Already Exists!`})
-
-        dbService.createDatabase(tdbName, indexes)
-            .then((response) => callback(undefined, {message: `Collection ${dbName} created`}))
-            .catch((e) => callback(e, undefined));
+        dbService.dbExists(dbName).then((exists) => {
+            if (exists)
+                return callback(undefined, {message: `Collection ${dbName} Already Exists!`});
+            dbService.createDatabase(dbName, indexes)
+                .then((response) => callback(undefined, {message: `Collection ${dbName} created`}))
+                .catch((e) => callback(e, undefined));
+        }).catch((e) => callback(e, undefined))
     }
 
     /**
@@ -223,6 +229,7 @@ function LightDBAdapter(config) {
     /**
      * Filters records in the specified table based on given conditions.
      *
+     * @param {string} forDid
      * @param {string} dbName - The name of the table to query.
      * @param {Object} filterConditions - The conditions to filter records by.
      * @param {"asc" | "dsc"} [sort] - Optional sorting criteria.
@@ -270,30 +277,27 @@ function LightDBAdapter(config) {
         const sortingField = getSortingKeyFromCondition(filterConditions);
         filterConditions = parseConditionsToDBQuery(filterConditions);
 
-        const db = dbService.openDatabase(dbName);
+        dbService.openDatabase(dbName).then((db) => {
+            if (!db)
+                return callback(undefined, []);
 
-        if (!db)
-            return callback(undefined, []);
+            let direction = false;
+            if (sort === "desc" || sort === "dsc") {
+                direction = true;
+            }
 
-        let direction = false;
-        if (sort === "desc" || sort === "dsc") {
-            direction = true;
-        }
+            // let result;
+            // try {
+            //     result = db.find(filterConditions).simplesort(sortingField, direction).limit(max).data();
+            // } catch (err) {
+            //     return callback(createOpenDSUErrorWrapper(`Filter operation failed on ${dbName}`, err));
+            // }
 
-        // let result;
-        // try {
-        //     result = db.find(filterConditions).simplesort(sortingField, direction).limit(max).data();
-        // } catch (err) {
-        //     return callback(createOpenDSUErrorWrapper(`Filter operation failed on ${dbName}`, err));
-        // }
-
-        // TODO: Add filter
-        dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
-        dbService.openDatabase(dbName).then(() => {
+            // TODO: Add filter
             dbService.filter(dbName, {})
                 .then((response) => callback(undefined, response))
                 .catch((e) => callback(createOpenDSUErrorWrapper(`Filter operation failed on ${dbName}`, e)));
-        }).catch((e) => callback(e));
+        }).catch((e) => callback(createOpenDSUErrorWrapper(`open operation failed on ${dbName}`, e)))
     }
 
     /**

@@ -16,6 +16,21 @@ class DBService {
     constructor(config) {
         this.config = config;
         this.dbConnection = this.__createConnection(config);
+        [
+            this.dbExists,
+            this.createDatabase,
+            this.openDatabase,
+            this.deleteDatabase,
+            this.listDatabases,
+            this.countDocs,
+            this.addIndex,
+            this.insertDocument,
+            this.readDocument,
+            this.updateDocument,
+            this.deleteDocument,
+            this.listDocuments,
+            this.filter,
+        ].forEach(this.__ensureAuth.bind(this));
     }
 
     /**
@@ -40,6 +55,33 @@ class DBService {
         });
 
         return this.dbConnection;
+    }
+
+    /**
+     *
+     * @param {Function} method
+     * @private
+     */
+    __ensureAuth(method){
+        const name = method.name
+        const original = this[name];
+        this[name] = async function(...args){
+            try {
+                return await original.apply(this, args);
+            } catch (e){
+                if (e.statusCode === 401 || e['status-code'] === 401) {
+                    try {
+                        console.debug(`Cookie expired - Re-authenticating with CouchDB server`);
+                        await this.dbConnection.auth(this.config.username, this.config.secret);
+                    } catch (err){
+                        throw new Error(`Failed to authenticate with CouchDB server to redo the ${name} operation. Error: ${err.message || err}. Original Error: ${e.message || e}`);
+                    }
+                    return await original.apply(this, args);
+                }
+                this._testErrorForShutdown(e)
+                throw e;
+            }
+        }.bind(this)
     }
 
     /**
@@ -80,9 +122,7 @@ class DBService {
             const dbList = await this.dbConnection.db.list();
             return dbList.includes(dbName);
         } catch (error) {
-            this._testErrorForShutdown(error);
-            logger.error(`Failed to check if database "${dbName}" exists:`, error);
-            return false;
+            throw new Error(`Failed to check if database "${dbName}" exists: ${error.message || error}`);
         }
     }
 
@@ -105,14 +145,14 @@ class DBService {
             await this.dbConnection.db.create(dbName);
             logger.info(`Database "${dbName}" created successfully.`);
 
-            const indexList = Array.isArray(indexes) && indexes.length ? indexes : [DBKeys.TIMESTAMP];
-            await this.addIndex(dbName, indexList);
-
+            const indexSet = new Set(Array.isArray(indexes) && indexes.length ? indexes : []);
+            indexSet.add(DBKeys.TIMESTAMP)
+            await this.addIndex(dbName, Array.from(indexSet));
             return true;
         } catch (err) {
-            this._testErrorForShutdown(err);
-            logger.error(`Fail creating database or adding indexes for "${dbName}".`);
-            throw err;
+            if (err.message.includes("the file already exists"))
+                return true;
+            throw new Error(`Fail creating database or adding indexes for ${dbName}: ${err.message || err}`);
         }
     }
 
@@ -134,9 +174,7 @@ class DBService {
             // TODO - Remove, return DBService instance
             return this.dbConnection.use(dbName);
         } catch (error) {
-            this._testErrorForShutdown(error);
-            logger.error(`Error in openDatabase: ${error.message || error}`);
-            throw error;
+            throw new Error(`Error in openDatabase: ${error.message || error}`);
         }
     }
 
@@ -151,14 +189,11 @@ class DBService {
             await this.dbConnection.db.destroy(dbName);
             return true;
         } catch (error) {
-            this._testErrorForShutdown(error);
             if (error.status === 404) {
                 logger.warn(`Database "${dbName}" does not exist. No deletion required.`);
                 return true;
             }
-
-            logger.error(`Error deleting database ${dbName}:`, error);
-            throw error;
+            throw new Error(`Error deleting database ${dbName}: ${error}`);
         }
     }
 
@@ -187,9 +222,7 @@ class DBService {
             }
             return databaseInfoList;
         } catch (error) {
-            this._testErrorForShutdown(error);
-            logger.error('Error listing databases:', error);
-            throw error;
+            throw new Error(`Error listing databases: ${error}`);
         }
     }
 
@@ -221,8 +254,7 @@ class DBService {
                 logger.warn(`Table "${tableName}" does not exist. Unable to count documents.`);
                 return 0;
             }
-            logger.error(`Failed to retrieve document count for table ${tableName}:`, error);
-            throw error;
+            throw new Error(`Failed to retrieve document count for table ${tableName}: ${error}`);
         }
     }
 
@@ -257,7 +289,6 @@ class DBService {
             logger.info(`Added index ${index} for table "${tableName}".`);
             return true;
         } catch (err) {
-            logger.error(`Could not add index ${index} on ${tableName}.`);
             throw new Error(`Could not add index ${index} on ${tableName}: ${err.message}`);
         }
     }
@@ -285,9 +316,8 @@ class DBService {
             };
 
             const {id} = await this.dbConnection.use(tableName).insert(insert);
-            return this.readDocument(tableName, id);
+            return await this.readDocument(tableName, id);
         } catch (err) {
-            logger.error(err);
             throw err;
         }
     }
@@ -347,8 +377,7 @@ class DBService {
                 throw new Error(`Failed to update document "${_id}" from "${tableName}": Not found.`);
             }
 
-            logger.error(`Failed to update document "${_id}" from "${tableName}":`, error);
-            throw error;
+            throw new Error(`Failed to update document "${_id}" from "${tableName}": ${error}`);
         }
     }
 
@@ -369,8 +398,7 @@ class DBService {
             if (error.statusCode === 404)
                 return {[OpenDSUKeys.PK]: _id};
 
-            logger.error(`Error deleting document ${_id} from table ${tableName}:`, error);
-            throw error;
+            throw new Error(`Error deleting document ${_id} from table ${tableName}: ${error}`);
         }
     }
 
@@ -402,8 +430,7 @@ class DBService {
             const response = await this.dbConnection.use(tableName).list(queryOptions);
             return processInChunks(response.rows, 2, (row) => remapObject(row.doc));
         } catch (error) {
-            logger.error(`Error listing documents from table ${tableName}:`, error);
-            throw error;
+            throw new Error(`Error listing documents from table ${tableName}: ${error}`);
         }
     }
 
@@ -438,8 +465,7 @@ class DBService {
             const result = await this.dbConnection.use(tableName).find(mangoQuery);
             return processInChunks(result.docs, 2, (doc) => remapObject(doc));
         } catch (error) {
-            logger.error(`Error filtering documents from table ${tableName}:`, error);
-            throw error;
+            throw new Error(`Error filtering documents from table ${tableName}: ${error}`);
         }
     }
 

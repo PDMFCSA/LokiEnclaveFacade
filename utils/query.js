@@ -154,7 +154,7 @@ function parseQueryPart(queryPart) {
  */
 function buildSelector(query) {
     if (typeof query === "object" && query !== null && Object.keys(query).length === 0)
-        return {};
+        return {timestamp: {$gt: null}}; // TODO
 
     if (!Array.isArray(query) || !query.every(item => typeof item === "string" && validateQueryOperators(item)))
         throw new Error("Query must be an array of valid condition strings");
