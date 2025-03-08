@@ -1,10 +1,12 @@
-function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunction) {
-    const logger = $$.getLogger("LokiEnclaveFacade", "LokiEnclaveFacade.js");
-    const LokiDb = require("./LokiDb");
+const LightDBAdapter = require("./adapters/LightDBAdapter");
+
+function CouchDBEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunction) {
+    const logger = $$.getLogger("CouchDBEnclaveFacade", "CouchDBEnclaveFacade.js");
+    const LightDBAdapter = require("./adapters/LightDBAdapter");
     const openDSU = require("opendsu");
     const aclAPI = require("acl-magic");
     const utils = openDSU.loadAPI("utils");
-    logger.info("Creating LokiEnclaveFacade instance");
+    logger.info("Creating CouchDBEnclaveFacade instance");
     const EnclaveMixin = openDSU.loadAPI("enclave").EnclaveMixin;
     EnclaveMixin(this);
 
@@ -18,7 +20,7 @@ function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunct
         return refreshInProgress;
     }
 
-    this.refresh =  (forDID, callback) => {
+    this.refresh = (forDID, callback) => {
         refreshInProgress = true;
         this.storageDB.refresh((err) => {
             refreshInProgress = false;
@@ -26,18 +28,18 @@ function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunct
         });
     }
 
-    this.saveDatabase =  (forDID, callback) => {
+    this.saveDatabase = (forDID, callback) => {
         this.storageDB.saveDatabase(callback);
     }
 
-    this.removeCollection =  (forDID, tableName, callback) => {
+    this.removeCollection = (forDID, tableName, callback) => {
         this.storageDB.removeCollection(tableName, callback);
     }
 
-    this.removeCollectionAsync =  (forDID, tableName) => {
+    this.removeCollectionAsync = (forDID, tableName) => {
         return new Promise((resolve, reject) => {
             this.storageDB.removeCollection(tableName, (err) => {
-                if(err){
+                if (err) {
                     return reject(err);
                 }
                 resolve();
@@ -45,16 +47,16 @@ function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunct
         });
     }
 
-    this.refreshAsync =  () => {
-        let self = this;
-        return new Promise((resolve, reject) => {
-            self.storageDB.refresh((err)=>{
-                if(err){
-                    return reject(err);
-                }
-                resolve();
-            });
-        });
+    this.refreshAsync = () => {
+        // let self = this;
+        // return new Promise((resolve, reject) => {
+        //     self.storageDB.refresh((err) => {
+        //         if (err) {
+        //             return reject(err);
+        //         }
+        //         resolve();
+        //     });
+        // });
     }
 
     const WRITE_ACCESS = "write";
@@ -142,7 +144,7 @@ function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunct
         this.storageDB.getCollections(callback);
     }
 
-    this.createCollection =  (forDID, tableName, indicesList, callback) => {
+    this.createCollection = (forDID, tableName, indicesList, callback) => {
         if (typeof indicesList === "function") {
             callback = indicesList;
             indicesList = undefined;
@@ -150,7 +152,7 @@ function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunct
         this.storageDB.createCollection(tableName, indicesList, callback);
     }
 
-    this.allowedInReadOnlyMode = function (functionName){
+    this.allowedInReadOnlyMode = function (functionName) {
         let readOnlyFunctions = ["getCollections",
             "listQueue",
             "queueSize",
@@ -177,8 +179,21 @@ function LokiEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunct
 
     utils.bindAutoPendingFunctions(this, ["on", "off", "dispatchEvent", "beginBatch", "isInitialised", "getEnclaveType", "getDID", "getUniqueIdAsync"]);
 
-    this.storageDB = new LokiDb(rootFolder, autosaveInterval, adaptorConstructorFunction);
+    // this.storageDB = new LokiDb(rootFolder, autosaveInterval, adaptorConstructorFunction);
+
+    let config;
+    try {
+        config = require("apihub").getServerConfig();
+    } catch (e) {
+        throw new Error(`Failed to read apihub. Error: ${e.message || e}}`);
+    }
+
+    this.storageDB = new LightDBAdapter({
+        uri: config.db.uri,
+        username: config.db.user,
+        secret: config.db.secret
+    });
     this.finishInitialisation();
 }
 
-module.exports = LokiEnclaveFacade;
+module.exports = CouchDBEnclaveFacade;

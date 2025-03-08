@@ -11,6 +11,10 @@ const createLightDBServerInstance = (config, callback) => {
     return new LightDBServer(config, callback);
 }
 
+const createCouchDBServerInstance = (config, callback) => {
+    return new LightDBAdapter(config, callback);
+}
+
 module.exports = {
     DBService,
     LightDBAdapter,
