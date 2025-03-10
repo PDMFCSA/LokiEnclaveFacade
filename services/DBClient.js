@@ -8,11 +8,11 @@ const {ensureAuth} = require("./utils");
  *
  */
 class DatabaseClient {
-    constructor(config, dbName) {
+    constructor(client, dbName) {
         logger = $$.getLogger(`DatabaseClient -  ${dbName}`);
-        this.config = config;
         this.dbName = dbName;
-        this.client = nano(this.config);
+        this.client = client;
+
         this.connection = this.client.use(dbName);
         [
             this.countDocs,
@@ -211,7 +211,7 @@ class DatabaseClient {
             const result = await this.connection.find(mangoQuery);
             return processInChunks(result.docs, 2, (doc) => remapObject(doc));
         } catch (error) {
-            throw new Error(`Error filtering documents from table ${tableName}: ${error}`);
+            throw new Error(`Error filtering documents from table ${this.dbName}: ${error}`);
         }
     }
 }
