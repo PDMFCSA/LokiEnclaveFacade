@@ -75,7 +75,7 @@ class DatabaseClient {
             }
         }
 
-        throw new Error(`A record with PK "${_id}" already exists in ${database}`);
+        throw new Error(`A record with PK "${_id}" already exists in ${this.dbName}`);
     }
 
     /**
