@@ -40,3 +40,9 @@ function testErrorForShutdown(error, logger){
         process.exit(1);
     }
 }
+
+
+module.exports =  {
+    testErrorForShutdown,
+    ensureAuth
+}
