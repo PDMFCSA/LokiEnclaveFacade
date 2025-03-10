@@ -129,13 +129,12 @@ class DatabaseClient {
             //     }
             //     throw new Error(`Failed to update document "${_id}" from "${database}": Not found.`);
             // }
-            throw new Error(`Failed to update document "${_id}" from "${database}": ${error}`);
+            throw new Error(`Failed to update document "${_id}" from "${this.dbName}": ${error}`);
         }
     }
 
     /**
      * Deletes a record from the specified table.
-     * @param {string} database
      * @param {string} _id - The primary key (ID) of the record to delete.
      * @returns {Promise<{ pk: string }>} - The deleted record.
      * @throws {Error} - If the operation fails.
