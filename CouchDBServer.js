@@ -313,4 +313,4 @@ function CouchDBServer(config, callback) {
 
 }
 
-module.exports = LightDBServer;
+module.exports = CouchDBServer;
