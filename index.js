@@ -28,5 +28,7 @@ module.exports = {
     LightDBAdapter,
     createLokiEnclaveFacadeInstance,
     createLightDBServerInstance,
+    createCouchDBEnclaveFacadeInstance,
+    createCouchDBServerInstance,
     Adapters: require("./adapters")
 }
