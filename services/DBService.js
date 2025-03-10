@@ -146,7 +146,7 @@ class DBService {
 
             function openAndCache(){
                 if (!(dbName in self.databases)){
-                    self.databases[dbName] = new DatabaseClient(self.config, dbName);
+                    self.databases[dbName] = new DatabaseClient(self.client, dbName);
                 }
                 return self.databases[dbName];
             }
