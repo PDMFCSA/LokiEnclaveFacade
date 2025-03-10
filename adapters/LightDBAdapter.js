@@ -170,6 +170,14 @@ function LightDBAdapter(config) {
      * @param {function(Error|undefined, { [key: string]: any })} callback
      */
     this.insertRecord = (forDID, dbName, pk, record, callback) => {
+        if(!callback) {
+            callback = record;
+            record = pk;
+            pk = dbName;
+            dbName = forDID;
+            forDID = undefined;
+        }
+
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         dbService.insertDocument(dbName, pk, record)
@@ -186,6 +194,13 @@ function LightDBAdapter(config) {
      * @param {function(Error|undefined, { [key: string]: any })} callback
      */
     this.getRecord = function (forDID, dbName, pk, callback) {
+        if(!callback) {
+            callback = pk;
+            pk = dbName;
+            dbName = forDID;
+            forDID = undefined;
+        }
+
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         dbService.readDocument(dbName, pk)
@@ -203,6 +218,14 @@ function LightDBAdapter(config) {
      * @param {function(Error|undefined, { [key: string]: any })} callback
      */
     this.updateRecord = function (forDID, dbName, pk, record, callback) {
+        if(!callback) {
+            callback = record;
+            record = pk;
+            pk = dbName;
+            dbName = forDID;
+            forDID = undefined;
+        }
+
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         dbService.updateDocument(dbName, pk, record)
@@ -219,6 +242,12 @@ function LightDBAdapter(config) {
      * @param {function(Error|undefined, {pk: string, [key: string]: any})} callback
      */
     this.deleteRecord = function (forDID, dbName, pk, callback) {
+        if(!callback) {
+            callback = pk;
+            pk = dbName;
+            dbName = forDID;
+            forDID = undefined;
+        }
         dbName = dbService.changeDBNameToLowerCaseAndValidate(dbName);
 
         dbService.deleteDocument(dbName, pk)
