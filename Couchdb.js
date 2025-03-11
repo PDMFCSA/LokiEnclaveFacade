@@ -19,7 +19,7 @@ function CouchDB(rootFolder, config) {
     try {
         const fs = require("fs");
         folderPath = rootFolder.replace(/\/database\/?$/, '')
-        if(fs.existsSync(folderPath));
+        if(!fs.existsSync(folderPath));
             fs.mkdirSync(folderPath, { recursive: true });
     } catch(e) {
         logger.info(`Failed to create folder ${folderPath}. ${e}`);
