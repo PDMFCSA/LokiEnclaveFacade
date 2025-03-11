@@ -1,8 +1,6 @@
-const LightDBAdapter = require("./adapters/LightDBAdapter");
-
 function CouchDBEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFunction) {
     const logger = $$.getLogger("CouchDBEnclaveFacade", "CouchDBEnclaveFacade.js");
-    const LightDBAdapter = require("./adapters/LightDBAdapter");
+    const CouchDB = require("./Couchdb");
     const openDSU = require("opendsu");
     const aclAPI = require("acl-magic");
     const utils = openDSU.loadAPI("utils");
@@ -20,7 +18,7 @@ function CouchDBEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFu
         return refreshInProgress;
     }
 
-    this.refresh = (forDID, callback) => {
+    this.refresh =  (forDID, callback) => {
         refreshInProgress = true;
         this.storageDB.refresh((err) => {
             refreshInProgress = false;
@@ -28,18 +26,18 @@ function CouchDBEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFu
         });
     }
 
-    this.saveDatabase = (forDID, callback) => {
+    this.saveDatabase =  (forDID, callback) => {
         this.storageDB.saveDatabase(callback);
     }
 
-    this.removeCollection = (forDID, tableName, callback) => {
+    this.removeCollection =  (forDID, tableName, callback) => {
         this.storageDB.removeCollection(tableName, callback);
     }
 
-    this.removeCollectionAsync = (forDID, tableName) => {
+    this.removeCollectionAsync =  (forDID, tableName) => {
         return new Promise((resolve, reject) => {
             this.storageDB.removeCollection(tableName, (err) => {
-                if (err) {
+                if(err){
                     return reject(err);
                 }
                 resolve();
@@ -47,16 +45,16 @@ function CouchDBEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFu
         });
     }
 
-    this.refreshAsync = () => {
-        // let self = this;
-        // return new Promise((resolve, reject) => {
-        //     self.storageDB.refresh((err) => {
-        //         if (err) {
-        //             return reject(err);
-        //         }
-        //         resolve();
-        //     });
-        // });
+    this.refreshAsync =  () => {
+        let self = this;
+        return new Promise((resolve, reject) => {
+            self.storageDB.refresh((err)=>{
+                if(err){
+                    return reject(err);
+                }
+                resolve();
+            });
+        });
     }
 
     const WRITE_ACCESS = "write";
@@ -144,7 +142,7 @@ function CouchDBEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFu
         this.storageDB.getCollections(callback);
     }
 
-    this.createCollection = (forDID, tableName, indicesList, callback) => {
+    this.createCollection =  (forDID, tableName, indicesList, callback) => {
         if (typeof indicesList === "function") {
             callback = indicesList;
             indicesList = undefined;
@@ -152,7 +150,7 @@ function CouchDBEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFu
         this.storageDB.createCollection(tableName, indicesList, callback);
     }
 
-    this.allowedInReadOnlyMode = function (functionName) {
+    this.allowedInReadOnlyMode = function (functionName){
         let readOnlyFunctions = ["getCollections",
             "listQueue",
             "queueSize",
@@ -179,8 +177,6 @@ function CouchDBEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFu
 
     utils.bindAutoPendingFunctions(this, ["on", "off", "dispatchEvent", "beginBatch", "isInitialised", "getEnclaveType", "getDID", "getUniqueIdAsync"]);
 
-    // this.storageDB = new LokiDb(rootFolder, autosaveInterval, adaptorConstructorFunction);
-
     let config;
     try {
         config = require("apihub").getServerConfig();
@@ -188,11 +184,12 @@ function CouchDBEnclaveFacade(rootFolder, autosaveInterval, adaptorConstructorFu
         throw new Error(`Failed to read apihub. Error: ${e.message || e}}`);
     }
 
-    this.storageDB = new LightDBAdapter({
+    this.storageDB = new CouchDB(rootFolder, {
         uri: config.db.uri,
         username: config.db.user,
         secret: config.db.secret
     });
+
     this.finishInitialisation();
 }
 
