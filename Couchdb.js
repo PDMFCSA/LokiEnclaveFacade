@@ -13,7 +13,7 @@ function CouchDB(rootFolder, config) {
     const CryptoSkills = w3cDID.CryptographicSkills;
     const baseConfig = config;
     const split = rootFolder.split('/');
-    const baseName = "a" + rootFolder.split('/')[split.length - 2];
+    const baseName = "db" + rootFolder.split('/')[split.length - 2];
 
     //compatibility
     try {
@@ -326,7 +326,7 @@ function CouchDB(rootFolder, config) {
             // }
 
             // TODO: Add filter
-            db.filter(tableName, {})
+            db.filter({}, {})
                 .then((response) => callback(undefined, response))
                 .catch((e) => callback(createOpenDSUErrorWrapper(`Filter operation failed on ${tableName}`, e)));
         }).catch((e) => callback(createOpenDSUErrorWrapper(`open operation failed on ${tableName}`, e)))

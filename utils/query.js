@@ -153,17 +153,23 @@ function parseQueryPart(queryPart) {
  * @throws {Error} - Throws an error if the input is not a valid array.
  */
 function buildSelector(query) {
-    if (typeof query === "object" && query !== null && Object.keys(query).length === 0)
-        return {timestamp: {$gt: null}}; // TODO
+    // if (typeof query === "object" && query !== null && Object.keys(query).length === 0)
+    //     return {timestamp: {$gt: null}}; // TODO
 
-    if (!Array.isArray(query) || !query.every(item => typeof item === "string" && validateQueryOperators(item)))
-        throw new Error("Query must be an array of valid condition strings");
+    // if (!Array.isArray(query) || !query.every(item => typeof item === "string" && validateQueryOperators(item)))
+    //     throw new Error("Query must be an array of valid condition strings");
 
-    if (query.length === 0)
-        return {};
+    // if (query.length === 0)
+    //     return {};
 
-    const conditions = query.map(parseQueryPart);
-    return {$and: conditions};
+    // const conditions = query.map(parseQueryPart);
+    // return {$and: conditions};
+
+    return {
+        timestamp: {
+            $gt: 0
+        }
+    }
 }
 
 
