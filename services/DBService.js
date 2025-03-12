@@ -95,7 +95,12 @@ class DBService {
         try {
             dbName = this.changeDBNameToLowerCaseAndValidate(dbName);
             const dbList = await this.client.db.list();
-            return dbList.includes(dbName);
+            const exists = dbList.includes(dbName);
+
+            if(!exists)
+                await this.createDatabase(dbName);
+
+            return true;
         } catch (error) {
             throw new Error(`Failed to check if database "${dbName}" exists: ${error.message || error}`);
         }
