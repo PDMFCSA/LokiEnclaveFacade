@@ -705,7 +705,7 @@ function CouchDB(rootFolder, config) {
      * --------------------------------------------------------------------
      */
     const getPrivateInfoForDID = (did, callback) => {
-        this.getRecord(DIDS_PRIVATE_KEYS, did, (err, record) => {
+        this.getRecord(undefined, DIDS_PRIVATE_KEYS, did, (err, record) => {
             if (err) {
                 return callback(err);
             }
