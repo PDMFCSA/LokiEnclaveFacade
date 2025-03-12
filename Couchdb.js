@@ -837,7 +837,10 @@ function CouchDB(rootFolder, config) {
      * DIDS METHODS END
      * --------------------------------------------------------------------
      */
+
+    this.finishInitialisation();
 }
+
 
 CouchDB.prototype.Adapters = {};
 module.exports = CouchDB;

@@ -11,8 +11,8 @@ const createLokiEnclaveFacadeInstance = (storage, autoSaveInterval, adaptorConst
 }
 
 const createLightDBServerInstance = (config, callback) => {
-    return new LightDBServer(config, callback);
-    // return createCouchDBServerInstance(config, callback);
+    // return new LightDBServer(config, callback);
+    return createCouchDBServerInstance(config, callback);
 }
 
 const createCouchDBEnclaveFacadeInstance = (storage, autoSaveInterval, adaptorConstructorFunction) => {
